@@ -1,0 +1,11 @@
+services:
+  coordinator:
+    build:
+      context: .
+      target: coordinator
+
+  # see: https://linuxhint.com/docker_compose_scale/
+  moderator:
+    build:
+      context: .
+      target: moderator
