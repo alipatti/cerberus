@@ -1,8 +1,10 @@
 # build files
 /target
+
+# annoying macOS files
 .DS_Store
 
-# latex
+# latex junk
 *.synctex.gz
 *.log
 *.aux
@@ -16,3 +18,5 @@
 *.cb
 *.cb2
 .*.lb
+*.bcf
+*.run.xml
