@@ -23,5 +23,6 @@ CMD ["./moderator"]
 
 FROM debian:buster-slim AS coordinator
 
+RUN apt-get update && apt-get install -y libssl-dev
 COPY  --from=builder usr/src/hecate/target/release/coordinator .
 CMD ["./coordinator"]

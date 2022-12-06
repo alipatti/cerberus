@@ -1,5 +1,4 @@
-/// Used for moderator threshold signatures
-// pub use frost_ed25519 as frost;
+/// Module containing the crypto primitives used by Cerberus.
 
 /// Used for moderator threshold encryption
 pub mod elgamal {
