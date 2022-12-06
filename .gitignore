@@ -1,3 +1,18 @@
 # build files
 /target
 .DS_Store
+
+# latex
+*.synctex.gz
+*.log
+*.aux
+*.lof
+*.lot
+*.fls
+*.out
+*.toc
+*.fmt
+*.fot
+*.cb
+*.cb2
+.*.lb

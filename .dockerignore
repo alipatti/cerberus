@@ -1,6 +1,0 @@
-.vscode
-/target
-Dockerfile
-docker-compose.yaml
-start.sh
-.gitignore

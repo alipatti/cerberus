@@ -15,9 +15,9 @@ impl GlobalParameters {
     /// Load global parameters from environment variables or uses defaults if they are unset.
     pub fn load() -> Result<GlobalParameters, Box<dyn Error>> {
         Ok(GlobalParameters {
-            n: env::var("HECATE_N").map_or(5, |var| var.parse().unwrap()),
-            t_sig: env::var("HECATE_T_SIG").map_or(5, |var| var.parse().unwrap()),
-            t_enc: env::var("HECATE_T_ENC").map_or(3, |var| var.parse().unwrap()),
+            n: env::var("CERBERUS_N").map_or(5, |var| var.parse().unwrap()),
+            t_sig: env::var("CERBERUS_T_SIG").map_or(5, |var| var.parse().unwrap()),
+            t_enc: env::var("CERBERUS_T_ENC").map_or(3, |var| var.parse().unwrap()),
             keys: PublicKeys {},
         })
     }

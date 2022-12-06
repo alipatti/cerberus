@@ -1,12 +1,14 @@
-// use distrib_mods::coordinator::{self, Coordinator};
-// use tokio;
+use cerberus::coordinator::Coordinator;
+use std::error::Error;
 
-// #[tokio::main]
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
     println!("Hello coordinator!");
-    // let coordinator = Coordinator::new();
+    let coordinator = Coordinator::new();
 
-    // coordinator.test().await;
+    // ensure that all moderators are up and running
 
-    // Ok(())
+    coordinator.test().await;
+
+    Ok(())
 }

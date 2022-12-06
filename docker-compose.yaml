@@ -1,11 +1,12 @@
 services:
   coordinator:
+    env_file: .env
     build:
       context: .
       target: coordinator
 
-  # see: https://linuxhint.com/docker_compose_scale/
   moderator:
+    scale: ${CERBERUS_N} # see: https://linuxhint.com/docker_compose_scale/
     build:
       context: .
       target: moderator

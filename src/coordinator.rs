@@ -24,10 +24,10 @@ impl Coordinator {
 
     /// test function
     pub async fn test(&self) -> Result<(), Box<dyn Error>> {
-        let body = http::ModeratorRequest {
+        let body = http::Request {
             hello: "world".into(),
         };
-        let responses = self.get_mod_responses("healthcheck", &body).await;
+        let responses = self.get_signature_shares(&body).await;
 
         println!("{responses:#?}");
 
@@ -37,17 +37,16 @@ impl Coordinator {
     }
 
     /// Gets signatures shares from all the moderators
-    async fn get_mod_responses(
+    async fn get_signature_shares(
         &self,
-        endpoint: &str,
-        body: &http::ModeratorRequest,
-    ) -> Result<Vec<http::ModeratorResponse>, Box<dyn Error>> {
-        let response_bodies = future::join_all((1..self.params.n).map(|i| async move {
-            let url = format!("https://moderator_{i}/{endpoint}");
+        body: &http::Request,
+    ) -> Result<Vec<http::Response>, Box<dyn Error>> {
+        let response_bodies = future::join_all((1..=self.params.n).map(|i| async move {
+            let url = format!("https://cerberus-moderator-{i}");
 
             // TODO explicitly handle error cases
             let response = self.client.get(url).json(body).send().await.unwrap();
-            let body: http::ModeratorResponse = response.json().await.unwrap();
+            let body: http::Response = response.json().await.unwrap();
 
             body
         }))
@@ -67,12 +66,12 @@ impl Default for Coordinator {
 pub mod http {
     use serde::{Deserialize, Serialize};
     #[derive(Deserialize, Serialize, Debug)]
-    pub(crate) struct ModeratorRequest {
-        pub(crate) hello: String,
+    pub struct Request {
+        pub hello: String,
     }
 
     #[derive(Deserialize, Debug, Serialize)]
-    pub(crate) struct ModeratorResponse {
-        pub(crate) hello: String,
+    pub struct Response {
+        pub hello: String,
     }
 }
