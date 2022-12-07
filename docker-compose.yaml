@@ -6,7 +6,7 @@ services:
       target: coordinator
 
   moderator:
-    scale: ${CERBERUS_N} # see: https://linuxhint.com/docker_compose_scale/
+    scale: ${CERBERUS_N} # this works despite the linter error. see: https://linuxhint.com/docker_compose_scale/
     build:
       context: .
       target: moderator

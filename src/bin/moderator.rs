@@ -1,44 +1,16 @@
-use std::io;
+use cerberus::roles::moderator::run_server;
 
-use actix_web::{get, middleware::Logger, web, App, HttpServer};
-use cerberus::communication;
-
-/// Endpoint to test whether the server is functioning.
-#[get("/healthcheck")]
-async fn healthcheck(
-    request: web::Json<communication::healthcheck::Request>,
-) -> web::Json<communication::healthcheck::Response> {
-    println!("Received message: {request:#?}");
-    web::Json(communication::healthcheck::Response {
-        message: "Hello from a moderator!".into(),
-    })
-}
-
-/// Endpoint queried by coordinator repeatedly during normal operation.
-#[get("/")]
-async fn index(
-    request: web::Json<communication::signing::Request>,
-) -> web::Json<communication::signing::Response> {
-    println!("{request:?}");
-
-    web::Json(communication::signing::Response {
-        hello: "world".into(),
-    })
-}
-
-#[actix_web::main]
+/// Runs the moderator server in its own process.
 #[allow(unused_must_use)]
-async fn main() -> io::Result<()> {
-    let server = HttpServer::new(|| {
-        App::new()
-            .wrap(Logger::default())
-            .service(healthcheck)
-            .service(index)
-    })
-    .bind("0.0.0.0:80")?
-    .run();
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    let server = run_server();
 
-    tokio::join!(server, async { println!("Server up!") });
+    // Server will yield control of the thread once it gets up and the async block will run
+    tokio::try_join!(server, async {
+        println!("Server up!");
+        Ok(())
+    })?;
 
     Ok(())
 }

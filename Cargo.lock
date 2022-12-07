@@ -350,8 +350,10 @@ version = "0.1.0"
 dependencies = [
  "actix-web",
  "criterion",
- "frost-ed25519",
+ "curve25519-dalek",
+ "frost-ristretto255",
  "futures",
+ "rand",
  "reqwest",
  "serde",
  "tokio",
@@ -681,24 +683,6 @@ dependencies = [
  "rand_core",
  "serde",
  "serde_json",
- "thiserror",
- "zeroize",
-]
-
-[[package]]
-name = "frost-ed25519"
-version = "0.1.0"
-source = "git+https://github.com/ZcashFoundation/frost#f79648dfa93f6e7a71e9b1653fafc97b17311396"
-dependencies = [
- "byteorder",
- "curve25519-dalek",
- "digest 0.10.6",
- "frost-core",
- "frost-ristretto255",
- "hex",
- "rand_core",
- "serde",
- "sha2",
  "thiserror",
  "zeroize",
 ]
