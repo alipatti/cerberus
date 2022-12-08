@@ -15,17 +15,22 @@ pub mod healthcheck {
 
 /// Setup round of communication
 pub mod setup {
+
     use frost_ristretto255 as frost;
     use serde::{Deserialize, Serialize};
+
+    use crate::roles::moderator::CommitmentBatch;
 
     #[derive(Deserialize, Debug, Serialize)]
     pub struct Request {
         pub secret_share: frost::keys::SecretShare,
     }
 
-    #[derive(Deserialize, Debug, Serialize)]
+    #[derive(Deserialize, Serialize)]
     pub struct Response {
-        pub hello: String,
+        // serde can't handle generic arrays by itself
+        #[serde(with = "serde_arrays")]
+        pub nonce_commitments: CommitmentBatch,
     }
 }
 

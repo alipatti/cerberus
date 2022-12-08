@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let share = shares[0].to_owned();
 
     let bytes = bincode::serialize(&share)?;
-    println!("{:?}", hex::encode(&bytes));
+    println!("{bytes:?}");
 
     let should_be_share: SecretShare = bincode::deserialize(&bytes)?;
     assert_eq!(should_be_share, share);

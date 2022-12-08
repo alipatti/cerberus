@@ -1,21 +1,28 @@
 // #[warn(clippy::pedantic)]
-#[macro_use]
-extern crate dotenv_codegen;
 
 pub mod communication;
 pub mod roles;
 
 pub mod parameters {
-    use konst::{primitive::parse_u16, unwrap_ctx};
+    use konst::{primitive::parse_usize, unwrap_ctx};
 
-    // sorta hacky, but it works...
+    // load environment variables at compile time
+    load_dotenv::load_dotenv!();
 
-    pub const N_MODERATORS: u16 =
-        unwrap_ctx!(parse_u16(dotenv!("CERBERUS_N_MODERATORS")));
-    pub const SIGNING_THRESHOLD: u16 =
-        unwrap_ctx!(parse_u16(dotenv!("CERBERUS_SIGNING_THRESHOLD")));
-    pub const DECRYPTION_THRESHOLD: u16 =
-        unwrap_ctx!(parse_u16(dotenv!("CERBERUS_ENCRYPTION_THRESHOLD")));
-    pub const BATCH_SIZE: u16 =
-        unwrap_ctx!(parse_u16(dotenv!("CERBERUS_BATCH_SIZE")));
+    /// The number of moderators
+    pub const N_MODERATORS: usize =
+        unwrap_ctx!(parse_usize(env!("CERBERUS_N_MODERATORS")));
+
+    /// The maximum number of dishonest parties
+    ///
+    /// Must be smaller than [`N_MODERATORS`]
+    pub const SIGNING_THRESHOLD: usize =
+        unwrap_ctx!(parse_usize(env!("CERBERUS_SIGNING_THRESHOLD")));
+
+    /// Must be smaller than [`N_MODERATORS`]
+    pub const DECRYPTION_THRESHOLD: usize =
+        unwrap_ctx!(parse_usize(env!("CERBERUS_ENCRYPTION_THRESHOLD")));
+
+    pub const BATCH_SIZE: usize =
+        unwrap_ctx!(parse_usize(env!("CERBERUS_BATCH_SIZE")));
 }

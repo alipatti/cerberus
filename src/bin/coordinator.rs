@@ -1,5 +1,6 @@
 use cerberus::{
     communication::healthcheck,
+    parameters::N_MODERATORS,
     roles::coordinator::{Coordinator, OneOrMany},
 };
 use std::{error::Error, thread, time};
@@ -17,7 +18,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         message: "Hello from the coordinator".into(),
     });
 
-    let responses: Vec<healthcheck::Response> = coordinator
+    let responses: [healthcheck::Response; N_MODERATORS] = coordinator
         .query_moderators("healthcheck", &request)
         .await?;
 
