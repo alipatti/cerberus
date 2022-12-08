@@ -27,7 +27,7 @@ fn main() -> Result<(), frost::Error> {
     ////////////////////////////////////////////////////////////////////////////
 
     // In practice, each iteration of this loop will be executed by its respective participant.
-    for participant_index in 1..(min_signers as u16 + 1) {
+    for participant_index in 1..=min_signers as u16 {
         let participant_identifier =
             participant_index.try_into().expect("should be nonzero");
         // Generate one (1) nonce and one SigningCommitments instance for each

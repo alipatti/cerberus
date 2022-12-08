@@ -6,7 +6,8 @@ use cerberus::roles::moderator::run_server;
 async fn main() -> std::io::Result<()> {
     let server = run_server();
 
-    // Server will yield control of the thread once it gets up and the async block will run
+    // server will yield control of the thread once it finishes its setup.
+    // then the async block will run... at least i think
     tokio::try_join!(server, async {
         println!("Server up!");
         Ok(())

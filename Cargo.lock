@@ -252,6 +252,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
 
 [[package]]
+name = "bincode"
+version = "1.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1f45e9417d87227c7a56d22e471c6206462cba514c7590c09aff4cf6d1ddcad"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "bit-set"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -349,13 +358,19 @@ name = "cerberus"
 version = "0.1.0"
 dependencies = [
  "actix-web",
+ "bincode",
  "criterion",
- "curve25519-dalek",
+ "dotenv",
+ "dotenv_codegen",
+ "frost-core",
  "frost-ristretto255",
  "futures",
+ "hex",
+ "konst",
  "rand",
  "reqwest",
  "serde",
+ "string-error",
  "tokio",
 ]
 
@@ -412,6 +427,12 @@ checksum = "2850f2f5a82cbf437dd5af4d49848fbdfc27c157c3d010345776f952765261c5"
 dependencies = [
  "os_str_bytes",
 ]
+
+[[package]]
+name = "const_panic"
+version = "0.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "58baae561b85ca19b3122a9ddd35c8ec40c3bcd14fe89921824eae73f7baffbf"
 
 [[package]]
 name = "convert_case"
@@ -606,6 +627,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "dotenv"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
+
+[[package]]
+name = "dotenv_codegen"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56966279c10e4f8ee8c22123a15ed74e7c8150b658b26c619c53f4a56eb4a8aa"
+dependencies = [
+ "dotenv_codegen_implementation",
+ "proc-macro-hack",
+]
+
+[[package]]
+name = "dotenv_codegen_implementation"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53e737a3522cd45f6adc19b644ce43ef53e1e9045f2d2de425c1f468abd4cf33"
+dependencies = [
+ "dotenv",
+ "proc-macro-hack",
+ "proc-macro2 1.0.47",
+ "quote 1.0.21",
+ "syn 1.0.105",
+]
+
+[[package]]
 name = "either"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -671,8 +721,8 @@ dependencies = [
 
 [[package]]
 name = "frost-core"
-version = "0.1.0-alpha.1"
-source = "git+https://github.com/ZcashFoundation/frost#f79648dfa93f6e7a71e9b1653fafc97b17311396"
+version = "0.1.0"
+source = "git+https://github.com/alipatti/frost?branch=add-serde#5ae59e3688dd3bf35920327a4481e45c59e59da7"
 dependencies = [
  "byteorder",
  "debugless-unwrap",
@@ -690,18 +740,13 @@ dependencies = [
 [[package]]
 name = "frost-ristretto255"
 version = "0.1.0"
-source = "git+https://github.com/ZcashFoundation/frost#f79648dfa93f6e7a71e9b1653fafc97b17311396"
+source = "git+https://github.com/alipatti/frost?branch=add-serde#5ae59e3688dd3bf35920327a4481e45c59e59da7"
 dependencies = [
- "byteorder",
  "curve25519-dalek",
- "digest 0.10.6",
  "frost-core",
- "hex",
  "rand_core",
  "serde",
  "sha2",
- "thiserror",
- "zeroize",
 ]
 
 [[package]]
@@ -1003,6 +1048,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "konst"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4850f150968eec6df7f1b348a0874db47a9bcd5e2a41ee1d347392f929590d9d"
+dependencies = [
+ "const_panic",
+ "konst_kernel",
+ "konst_proc_macros",
+]
+
+[[package]]
+name = "konst_kernel"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7771682454392dfe62a909aba2c6efc6674e2ad0b678fbc33b154e2e1bd59b89"
+
+[[package]]
+name = "konst_proc_macros"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4e28ab1dc35e09d60c2b8c90d12a9a8d9666c876c10a3739a3196db0103b6043"
+
+[[package]]
 name = "language-tags"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1285,6 +1353,12 @@ name = "ppv-lite86"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
+
+[[package]]
+name = "proc-macro-hack"
+version = "0.5.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbf0c48bc1d91375ae5c3cd81e3722dff1abcf81a30960240640d223f59fe0e5"
 
 [[package]]
 name = "proc-macro2"
@@ -1678,6 +1752,12 @@ dependencies = [
  "libc",
  "winapi",
 ]
+
+[[package]]
+name = "string-error"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "439558b73299d7afdf52c36399c3c812cca10fe5ca08429f38815df5bacf3ef7"
 
 [[package]]
 name = "subtle"
