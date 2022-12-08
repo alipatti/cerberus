@@ -223,6 +223,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "array-init"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d62b7694a562cdf5a74227903507c56ab2cc8bdd1f781ed5cb4cf9c9f810bfc"
+
+[[package]]
 name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -335,6 +341,7 @@ name = "cerberus"
 version = "0.1.0"
 dependencies = [
  "actix-web",
+ "array-init",
  "bincode",
  "frost-core",
  "frost-ristretto255",
@@ -345,7 +352,6 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_arrays",
- "string-error",
  "tokio",
 ]
 
@@ -1485,12 +1491,6 @@ dependencies = [
  "libc",
  "winapi",
 ]
-
-[[package]]
-name = "string-error"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "439558b73299d7afdf52c36399c3c812cca10fe5ca08429f38815df5bacf3ef7"
 
 [[package]]
 name = "subtle"

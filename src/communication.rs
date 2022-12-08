@@ -1,25 +1,20 @@
 /// Setup round of communication
-pub mod healthcheck {
+pub mod ping {
     use serde::{Deserialize, Serialize};
 
-    #[derive(Deserialize, Serialize, Debug)]
-    pub struct Request {
-        pub message: String,
-    }
+    #[derive(Deserialize, Serialize)]
+    pub struct Request;
 
-    #[derive(Deserialize, Debug, Serialize)]
-    pub struct Response {
-        pub message: String,
-    }
+    #[derive(Deserialize, Serialize)]
+    pub struct Response;
 }
 
 /// Setup round of communication
 pub mod setup {
 
+    use crate::batches::CommitmentBatch;
     use frost_ristretto255 as frost;
     use serde::{Deserialize, Serialize};
-
-    use crate::roles::moderator::CommitmentBatch;
 
     #[derive(Deserialize, Debug, Serialize)]
     pub struct Request {

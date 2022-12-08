@@ -1,11 +1,12 @@
+use crate::batches::{
+    CommitmentBatch, NonceBatch, SignatureBatch, UnsignedTokenBatch,
+};
 use crate::parameters::BATCH_SIZE;
+use crate::token::UnsignedToken;
 use actix_web::{dev::Server, middleware::Logger, web, App, HttpServer};
-use frost::{round1::SigningNonces, round2::SignatureShare};
 use frost_ristretto255 as frost;
 use rand::rngs::ThreadRng;
 use std::{io, sync::Mutex};
-pub use token::SignedToken;
-pub(crate) use token::UnsignedToken;
 
 pub async fn run_server() -> io::Result<Server> {
     // TODO add HTTPS
@@ -16,16 +17,12 @@ pub async fn run_server() -> io::Result<Server> {
         App::new()
             .app_data(state.clone())
             .wrap(Logger::default())
-            .service(endpoints::healthcheck)
+            .service(endpoints::ping)
             .service(endpoints::sign)
     })
     .bind("0.0.0.0:80")? // listen on default http port
     .run())
 }
-
-pub type NonceBatch = [SigningNonces; BATCH_SIZE];
-
-pub type CommitmentBatch = [frost::round1::SigningCommitments; BATCH_SIZE];
 
 struct Moderator {
     frost_key_package: frost::keys::KeyPackage,
@@ -54,7 +51,7 @@ impl Moderator {
         )
     }
 
-    fn sign(token: UnsignedToken) -> SignatureShare {
+    fn sign(token: UnsignedToken) -> frost::round2::SignatureShare {
         unimplemented!()
     }
 
@@ -98,8 +95,9 @@ mod endpoints {
     use frost_ristretto255 as frost;
 
     /// Endpoint to test whether the server is functioning.
-    #[get("/healthcheck")]
-    pub(super) async fn healthcheck() -> impl Responder {
+    #[get("/ping")]
+    pub(super) async fn ping() -> impl Responder {
+        println!("Server online");
         HttpResponse::Ok()
     }
 
@@ -151,10 +149,14 @@ mod endpoints {
         // acquire mutex lock
         let state = state.lock().unwrap(); // CHECK will this ever panic?
 
-        if state.is_none() {
+        if (*state).is_none() {
             return HttpResponse::Forbidden()
                 .body("/setup must be queried before /sign");
         }
+
+        // TODO
+
+        // create new batch of nones which are included in the response
 
         HttpResponse::Ok().json(coms::signing::Response {
             hello: "world".into(),
@@ -164,36 +166,5 @@ mod endpoints {
     #[get("/decrypt")]
     pub(super) async fn decrypt() -> impl Responder {
         HttpResponse::NotImplemented()
-    }
-}
-
-mod token {
-    use super::frost;
-    use serde::{Deserialize, Serialize};
-    use std::{error::Error, time::SystemTime};
-
-    #[derive(Serialize, Deserialize)]
-    pub struct SignedToken {
-        signature: frost::Signature,
-    }
-
-    pub(crate) struct UnsignedToken {
-        timestamp: SystemTime,
-        id_encryption: u32, // TODO
-        pk_e: u32,          // TODO
-    }
-
-    impl SignedToken {
-        pub fn verify(&self) -> Result<(), Box<dyn Error>> {
-            unimplemented!()
-        }
-    }
-
-    impl UnsignedToken {
-        pub(crate) fn sign_partial(
-            frost_key_package: frost::keys::KeyPackage,
-        ) -> frost::round2::SignatureShare {
-            unimplemented!()
-        }
     }
 }

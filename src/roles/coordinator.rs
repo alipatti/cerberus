@@ -1,4 +1,5 @@
 use crate::{
+    batches::CommitmentBatch,
     communication as coms,
     parameters::{N_MODERATORS, SIGNING_THRESHOLD},
 };
@@ -6,42 +7,82 @@ use crate::{
 use frost_ristretto255 as frost;
 use futures::future;
 use rand::rngs::ThreadRng;
-use reqwest::StatusCode;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 use std::error::Error;
 
 pub struct Coordinator {
     client: reqwest::Client,
     rng: ThreadRng,
+    frost_public_key_package: frost::keys::PublicKeyPackage,
+
+    /// Ordered like `nonce_commitments [moderator_index] [token_index]`
+    nonce_commitments: [CommitmentBatch; N_MODERATORS],
 }
 
-// TODO make this private
-pub enum OneOrMany<T> {
+enum OneOrMany<T> {
     One(T),
     Many([T; N_MODERATORS as usize]),
 }
 
 impl Coordinator {
-    /// Creates a new coordinator object.
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
-        Coordinator {
-            client: reqwest::Client::new(),
-            rng: ThreadRng::default(),
-        }
+    /// Sets up the coordinator and moderators
+    ///
+    /// Returns a new coordinator object if successful.
+    pub async fn setup() -> Result<Self, Box<dyn Error>> {
+        let client = reqwest::Client::new();
+        let mut rng = ThreadRng::default();
+
+        // Ensure that all moderators are online and reachable.
+        // TODO keep trying until it works
+        Self::query_moderators::<coms::ping::Response>(
+            &client,
+            "ping",
+            &OneOrMany::One(coms::ping::Request),
+        )
+        .await?;
+
+        let (frost_public_key_package, nonce_commitments) = {
+            let (secret_shares, public_keys) = frost::keys::keygen_with_dealer(
+                N_MODERATORS as u16,
+                SIGNING_THRESHOLD as u16,
+                &mut rng,
+            )?;
+
+            let request_bodies = array_init::from_iter(secret_shares)
+                .expect("Wrong number of secret_shares."); // this should never trigger
+
+            let responses = Self::query_moderators::<coms::setup::Response>(
+                &client,
+                "setup",
+                &OneOrMany::Many(request_bodies),
+            )
+            .await?;
+
+            let nonce_commitments = array_init::from_iter(
+                responses.iter().map(|response| response.nonce_commitments),
+            )
+            .expect("Not enough nonce commitments.");
+
+            (public_keys, nonce_commitments)
+        };
+
+        Ok(Coordinator {
+            client,
+            rng,
+            frost_public_key_package,
+            nonce_commitments,
+        })
     }
 
-    // TODO make this private
     /// Sends a query to every moderator at the provided endpoint and with the provided body.
     ///
     /// Returns an array of type [`Res`; [`N_MODERATORS`]]
-    pub async fn query_moderators<Res: Serialize + DeserializeOwned>(
-        &self,
+    async fn query_moderators<Res: Serialize + DeserializeOwned>(
+        client: &reqwest::Client,
         endpoint: &str,
         payload: &OneOrMany<impl Serialize + DeserializeOwned>,
     ) -> Result<[Res; N_MODERATORS], Box<dyn Error>> {
-        // fetch all responses in parallel
-        let responses: Vec<Res> =
+        array_init::from_iter(
             future::try_join_all((1..=N_MODERATORS).map(|i| async move {
                 let url = format!("http://cerberus-moderator-{i}/{endpoint}");
                 let body = match payload {
@@ -49,41 +90,17 @@ impl Coordinator {
                     OneOrMany::Many(bodies) => &bodies[i as usize],
                 };
 
-                let response = self.client.get(&url).json(body).send().await?;
+                let response = client.get(&url).json(body).send().await?;
 
-                if response.status() != StatusCode::OK {
-                    return Err(string_error::into_err(response.text().await?));
+                // error on non-200 responses
+                if response.status() != reqwest::StatusCode::OK {
+                    return Err(<Box<dyn Error>>::from(response.text().await?));
                 }
 
                 Ok(response.json().await?)
             }))
-            .await?;
-
-        Ok(responses.try_into().unwrap_or_else(|_| panic!()))
-    }
-
-    /// Distributes encryption and signing key shares to the moderators.
-    ///
-    /// In practice, this centralized share dealing can be replaced by a distributed key generation protocol such as [TODO fill this in].
-    pub async fn setup(&mut self) -> Result<(), Box<dyn Error>> {
-        // TODO implement DKG
-        let (secret_shares, public_keys) = frost::keys::keygen_with_dealer(
-            N_MODERATORS as u16,
-            SIGNING_THRESHOLD as u16,
-            &mut self.rng,
-        )?;
-
-        let request_bodies = secret_shares
-            .into_iter()
-            .map(|secret_share| coms::setup::Request { secret_share })
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap();
-
-        let responses: [coms::setup::Response; N_MODERATORS] = self
-            .query_moderators("setup", &OneOrMany::Many(request_bodies))
-            .await?;
-
-        Ok(())
+            .await?,
+        )
+        .ok_or_else(|| "Failed to convert response vector into array".into())
     }
 }

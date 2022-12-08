@@ -1,28 +1,16 @@
-use cerberus::{
-    communication::healthcheck,
-    parameters::N_MODERATORS,
-    roles::coordinator::{Coordinator, OneOrMany},
-};
+use cerberus::roles::coordinator::Coordinator;
 use std::{error::Error, thread, time};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     // try to reach the other moderators
-    let coordinator = Coordinator::new();
 
     println!("Waiting for moderators to spin up their servers...");
     thread::sleep(time::Duration::from_secs(2));
 
-    // TODO move this into `lib`
-    let request = OneOrMany::One(healthcheck::Request {
-        message: "Hello from the coordinator".into(),
-    });
-
-    let responses: [healthcheck::Response; N_MODERATORS] = coordinator
-        .query_moderators("healthcheck", &request)
-        .await?;
-
-    println!("{responses:#?}");
+    // start up coordinator
+    // under the hood, this calls the
+    let coordinator = Coordinator::setup().await?;
 
     Ok(())
 }
