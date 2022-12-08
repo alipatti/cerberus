@@ -1,13 +1,12 @@
 // #[warn(clippy::pedantic)]
 
-pub mod communication;
+mod communication;
 pub mod roles;
 
-pub mod parameters {
+mod parameters {
     use konst::{primitive::parse_usize, unwrap_ctx};
 
-    // load environment variables at compile time
-    load_dotenv::load_dotenv!();
+    load_dotenv::load_dotenv!(); // load environment variables at compile time
 
     /// The number of moderators
     pub const N_MODERATORS: usize =
@@ -28,21 +27,8 @@ pub mod parameters {
         unwrap_ctx!(parse_usize(env!("CERBERUS_BATCH_SIZE")));
 }
 
-mod batches {
-    use crate::parameters::BATCH_SIZE;
-    use crate::token::UnsignedToken;
-    use frost_ristretto255 as frost;
-
-    pub(crate) type NonceBatch = [frost::round1::SigningNonces; BATCH_SIZE];
-
-    pub(crate) type CommitmentBatch =
-        [frost::round1::SigningCommitments; BATCH_SIZE];
-
-    pub(crate) type SignatureBatch =
-        [frost::round2::SignatureShare; BATCH_SIZE];
-
-    pub(crate) type UnsignedTokenBatch = [UnsignedToken; BATCH_SIZE];
-}
+struct UserId(u64);
+type Batch<T> = [T; parameters::BATCH_SIZE];
 
 mod token {
     use frost_ristretto255 as frost;
@@ -51,25 +37,19 @@ mod token {
 
     #[derive(Serialize, Deserialize)]
     pub struct SignedToken {
-        signature: frost::Signature,
+        pub signature: frost::Signature,
+        // TODO fill in the rest
     }
 
+    #[derive(Serialize, Deserialize)]
     pub(crate) struct UnsignedToken {
-        timestamp: SystemTime,
+        // timestamp: SystemTime,
         id_encryption: u32, // TODO
         pk_e: u32,          // TODO
     }
 
     impl SignedToken {
         pub fn verify(&self) -> Result<(), Box<dyn Error>> {
-            unimplemented!()
-        }
-    }
-
-    impl UnsignedToken {
-        pub(crate) fn sign_partial(
-            frost_key_package: frost::keys::KeyPackage,
-        ) -> frost::round2::SignatureShare {
             unimplemented!()
         }
     }

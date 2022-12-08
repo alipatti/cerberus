@@ -1,11 +1,15 @@
-use crate::batches::{
-    CommitmentBatch, NonceBatch, SignatureBatch, UnsignedTokenBatch,
-};
-use crate::parameters::BATCH_SIZE;
+// TODO Get rid of actix web here and use a single-threaded framework
+
 use crate::token::UnsignedToken;
+use crate::{parameters::BATCH_SIZE, Batch};
 use actix_web::{dev::Server, middleware::Logger, web, App, HttpServer};
+use frost::{
+    round1::{SigningCommitments, SigningNonces},
+    round2::{SignatureShare, SigningPackage},
+};
 use frost_ristretto255 as frost;
 use rand::rngs::ThreadRng;
+use std::error::Error;
 use std::{io, sync::Mutex};
 
 pub async fn run_server() -> io::Result<Server> {
@@ -21,6 +25,7 @@ pub async fn run_server() -> io::Result<Server> {
             .service(endpoints::sign)
     })
     .bind("0.0.0.0:80")? // listen on default http port
+    .workers(1)
     .run())
 }
 
@@ -30,7 +35,7 @@ struct Moderator {
     /// The next batch of nonces to use
     ///
     /// These MUST be kept in sync with the commitment values sent to the coordinator.
-    nonces: NonceBatch,
+    nonces: Batch<SigningNonces>,
 }
 
 type ServerState = web::Data<Mutex<Option<Moderator>>>;
@@ -38,7 +43,7 @@ type ServerState = web::Data<Mutex<Option<Moderator>>>;
 impl Moderator {
     pub fn init(
         frost_key_package: frost::keys::KeyPackage,
-    ) -> (Self, CommitmentBatch) {
+    ) -> (Self, Batch<SigningCommitments>) {
         let (nonces, commitments) =
             Moderator::generate_nonces(&frost_key_package);
 
@@ -51,14 +56,44 @@ impl Moderator {
         )
     }
 
-    fn sign(token: UnsignedToken) -> frost::round2::SignatureShare {
-        unimplemented!()
+    /// Signs a new batch of tokens
+    ///
+    /// Internally, this method also updates the stored nonces and returns a new batch of commitments.
+    pub fn sign_batch(
+        &mut self,
+        signing_packages: &Batch<SigningPackage>,
+    ) -> Result<
+        (Batch<SignatureShare>, Batch<SigningCommitments>),
+        Box<dyn Error>,
+    > {
+        let signatures = array_init::try_array_init(|i| {
+            let signing_package = &signing_packages[i];
+            let token_to_sign: UnsignedToken =
+                bincode::deserialize(signing_package.message())?;
+
+            // TODO somehow verify the token
+
+            let signature_share = frost::round2::sign(
+                signing_package,
+                &self.nonces[i],
+                &self.frost_key_package,
+            )?;
+
+            // awkward type hinting
+            Ok::<_, Box<dyn Error>>(signature_share)
+        })?;
+
+        let (new_nonces, new_commitments) =
+            Moderator::generate_nonces(&self.frost_key_package);
+        self.nonces = new_nonces;
+
+        Ok((signatures, new_commitments))
     }
 
     // not a &self method because it's called by init
     fn generate_nonces(
         frost_key_package: &frost::keys::KeyPackage,
-    ) -> (NonceBatch, CommitmentBatch) {
+    ) -> (Batch<SigningNonces>, Batch<SigningCommitments>) {
         // TODO port to array-init
         let mut rng = ThreadRng::default();
 
@@ -89,6 +124,8 @@ impl Moderator {
 }
 
 mod endpoints {
+    use std::ops::{Deref, DerefMut};
+
     use super::{Moderator, ServerState};
     use crate::communication as coms;
     use actix_web::{get, web, HttpResponse, Responder};
@@ -147,20 +184,18 @@ mod endpoints {
         state: ServerState,
     ) -> HttpResponse {
         // acquire mutex lock
-        let state = state.lock().unwrap(); // CHECK will this ever panic?
+        let mut state = state.lock().unwrap(); // CHECK will this ever panic?
+        let moderator = match state.deref_mut() {
+            Some(moderator) => moderator,
+            None => {
+                return HttpResponse::Forbidden()
+                    .body("/setup must be queried before /sign")
+            }
+        };
 
-        if (*state).is_none() {
-            return HttpResponse::Forbidden()
-                .body("/setup must be queried before /sign");
-        }
+        moderator.sign_batch(&request.signing_packages);
 
-        // TODO
-
-        // create new batch of nones which are included in the response
-
-        HttpResponse::Ok().json(coms::signing::Response {
-            hello: "world".into(),
-        })
+        unimplemented!()
     }
 
     #[get("/decrypt")]

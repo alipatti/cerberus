@@ -1,9 +1,11 @@
 use crate::{
-    batches::CommitmentBatch,
     communication as coms,
     parameters::{N_MODERATORS, SIGNING_THRESHOLD},
+    token::{self, SignedToken, UnsignedToken},
+    Batch,
 };
 
+use frost::{round1::SigningCommitments, SigningPackage};
 use frost_ristretto255 as frost;
 use futures::future;
 use rand::rngs::ThreadRng;
@@ -16,13 +18,15 @@ pub struct Coordinator {
     frost_public_key_package: frost::keys::PublicKeyPackage,
 
     /// Ordered like `nonce_commitments [moderator_index] [token_index]`
-    nonce_commitments: [CommitmentBatch; N_MODERATORS],
+    nonce_commitments: [Batch<frost::round1::SigningCommitments>; N_MODERATORS],
 }
 
-enum OneOrMany<T> {
-    One(T),
-    Many([T; N_MODERATORS as usize]),
+enum ModeratorRequest<'a, T> {
+    One(&'a T),
+    Many(&'a [T; N_MODERATORS]),
 }
+
+type ModeratorResponses<Res> = [Res; N_MODERATORS];
 
 impl Coordinator {
     /// Sets up the coordinator and moderators
@@ -34,10 +38,10 @@ impl Coordinator {
 
         // Ensure that all moderators are online and reachable.
         // TODO keep trying until it works
-        Self::query_moderators::<coms::ping::Response>(
+        Self::query_moderators::<_, coms::ping::Response>(
             &client,
             "ping",
-            &OneOrMany::One(coms::ping::Request),
+            ModeratorRequest::One(&coms::ping::Request),
         )
         .await?;
 
@@ -51,10 +55,10 @@ impl Coordinator {
             let request_bodies = array_init::from_iter(secret_shares)
                 .expect("Wrong number of secret_shares."); // this should never trigger
 
-            let responses = Self::query_moderators::<coms::setup::Response>(
+            let responses = Self::query_moderators::<_, coms::setup::Response>(
                 &client,
                 "setup",
-                &OneOrMany::Many(request_bodies),
+                ModeratorRequest::Many(&request_bodies),
             )
             .await?;
 
@@ -74,20 +78,88 @@ impl Coordinator {
         })
     }
 
+    async fn sign_token_batch(
+        &self,
+        unsigned_tokens: Batch<UnsignedToken>,
+    ) -> Result<Batch<SignedToken>, Box<dyn Error>> {
+        let signing_packages = array_init::try_array_init(
+            |token_index| -> Result<SigningPackage, Box<dyn Error>> {
+                // serialize the token so it can be passed to frost::sign()
+                let serialized_token: Vec<u8> =
+                    bincode::serialize(&unsigned_tokens[token_index])?;
+
+                // collect the signing_commitments for this specific token
+                let signing_commitments: Vec<SigningCommitments> = (0
+                    ..N_MODERATORS)
+                    .map(|moderator_index| {
+                        self.nonce_commitments[moderator_index][token_index]
+                    })
+                    .collect();
+
+                // create the signing package
+                Ok(frost::round2::SigningPackage::new(
+                    signing_commitments,
+                    serialized_token,
+                ))
+            },
+        )?;
+
+        // FIX sorta hacky
+        // maybe make the query_moderators function take references to the data itself instead of wrapping it in a request struct
+        let request = coms::signing::Request {
+            signing_packages: signing_packages.clone(),
+        };
+
+        // get signature shares from each moderator for all tokens in the batch
+        let moderator_responses =
+            Self::query_moderators::<_, coms::signing::Response>(
+                &self.client,
+                "sign",
+                ModeratorRequest::One(&request),
+            )
+            .await?;
+
+        // package the results as a SignedTokenBatch batch
+        let signed_tokens: Batch<SignedToken> = array_init::try_array_init(
+            |token_index| -> Result<SignedToken, Box<dyn Error>> {
+                let signature_shares: Vec<_> = moderator_responses
+                    .iter()
+                    .map(|response| response.signature_shares[token_index])
+                    .collect();
+
+                let signature = frost::aggregate(
+                    &signing_packages[token_index],
+                    &signature_shares,
+                    &self.frost_public_key_package,
+                )?;
+
+                Ok(SignedToken { signature })
+            },
+        )?;
+
+        Ok(signed_tokens)
+    }
+
     /// Sends a query to every moderator at the provided endpoint and with the provided body.
     ///
     /// Returns an array of type [`Res`; [`N_MODERATORS`]]
-    async fn query_moderators<Res: Serialize + DeserializeOwned>(
+    /// TODO add description for [`OneOrMany`]
+    async fn query_moderators<Req, Res>(
         client: &reqwest::Client,
         endpoint: &str,
-        payload: &OneOrMany<impl Serialize + DeserializeOwned>,
-    ) -> Result<[Res; N_MODERATORS], Box<dyn Error>> {
+        payload: ModeratorRequest<'_, Req>,
+    ) -> Result<ModeratorResponses<Res>, Box<dyn Error>>
+    where
+        Req: Serialize + DeserializeOwned,
+        Res: Serialize + DeserializeOwned,
+    {
+        let payload = &payload;
         array_init::from_iter(
             future::try_join_all((1..=N_MODERATORS).map(|i| async move {
                 let url = format!("http://cerberus-moderator-{i}/{endpoint}");
                 let body = match payload {
-                    OneOrMany::One(body) => body,
-                    OneOrMany::Many(bodies) => &bodies[i as usize],
+                    ModeratorRequest::One(body) => body,
+                    ModeratorRequest::Many(bodies) => &bodies[i],
                 };
 
                 let response = client.get(&url).json(body).send().await?;
