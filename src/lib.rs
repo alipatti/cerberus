@@ -43,7 +43,7 @@ mod token {
 
     #[derive(Serialize, Deserialize)]
     pub(crate) struct UnsignedToken {
-        // timestamp: SystemTime,
+        timestamp: SystemTime,
         id_encryption: u32, // TODO
         pk_e: u32,          // TODO
     }

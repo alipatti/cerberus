@@ -22,3 +22,7 @@ load-dotenv = "0.1.2"
 frost-ristretto255 = { path = "../frost/frost-ristretto255" }
 frost-core = { path = "../frost/frost-core" }
 array-init = "2.1.0"
+cryptid = "0.2.8"
+hyper = { version = "0.14.23", features = ["server"] }
+simple-server = "0.4.0"
+tiny_http = "0.12.0"
