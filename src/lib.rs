@@ -1,5 +1,7 @@
 // #[warn(clippy::pedantic)]
 
+use serde::{Deserialize, Serialize};
+
 mod communication;
 mod elgamal;
 pub mod roles;
@@ -29,7 +31,10 @@ mod parameters {
         unwrap_ctx!(parse_usize(env!("CERBERUS_BATCH_SIZE")));
 }
 
+#[derive(Deserialize, Serialize, Clone, Copy)]
 pub struct UserId(u64);
 pub type UserPublicKey = [u8; 32]; // TODO
 
 type Batch<T> = [T; parameters::BATCH_SIZE];
+
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
