@@ -7,23 +7,28 @@ use curve25519_dalek::{
     scalar::Scalar, traits::Identity,
 };
 use rand::rngs::ThreadRng;
-use sha2::Sha512;
 use std::error::Error;
 use vsss_rs::{curve25519::WrappedScalar, Shamir};
 
+//  Map between Ristretto point and UserId
+// -----------------------------------------
+
 impl From<RistrettoPoint> for UserId {
     fn from(curve_point: RistrettoPoint) -> Self {
+        // https://eprint.iacr.org/2013/373.pdf
         unimplemented!()
     }
 }
 
-impl Into<RistrettoPoint> for UserId {
+impl Into<RistrettoPoint> for &UserId {
     fn into(self) -> RistrettoPoint {
+        // https://eprint.iacr.org/2013/373.pdf
         unimplemented!()
     }
 }
 
-struct EncryptedUserId(RistrettoPoint);
+//            Key implementations
+// -----------------------------------------
 
 struct PrivateKey(Scalar);
 
@@ -42,10 +47,12 @@ impl PrivateKey {
     /// The decryption shares created by the private keys can be added
     /// (with appropriate Lagrange multipliers) to decrypt a message encoded with
     /// the group key.
-    fn create_shares(&self) -> Result<[Scalar; N_MODERATORS], Box<dyn Error>> {
+    fn create_shares(
+        &self,
+    ) -> Result<[PrivateKey; N_MODERATORS], Box<dyn Error>> {
         let mut rng = ThreadRng::default();
 
-        let private_key_shares: [Scalar; N_MODERATORS] = array_init::from_iter(
+        array_init::from_iter(
             Shamir {
                 n: N_MODERATORS,
                 t: DECRYPTION_THRESHOLD,
@@ -55,15 +62,12 @@ impl PrivateKey {
             .into_iter()
             .map(|share| {
                 // TODO handle errors
-                let bytes: [u8; 32] = share.value().try_into().unwrap();
+                let bytes = share.value().try_into().unwrap();
                 let scalar = Scalar::from_canonical_bytes(bytes).unwrap();
-
-                scalar
+                PrivateKey(scalar)
             }),
         )
-        .unwrap(); // TODO handle error
-
-        Ok(private_key_shares)
+        .ok_or_else(|| "Not enough shares".into())
     }
 }
 
@@ -74,34 +78,52 @@ impl PublicKey {
         &self,
         user_id: &UserId,
         randomness: Option<Scalar>,
-    ) -> Ciphertext {
+    ) -> EncryptedUserId {
         let mut rng = ThreadRng::default();
         let randomness = randomness.unwrap_or_else(|| Scalar::random(&mut rng));
-        let message =
-            RistrettoPoint::hash_from_bytes::<Sha512>(&user_id.0.to_be_bytes());
+        let id_as_point: RistrettoPoint = user_id.into();
 
-        Ciphertext {
+        EncryptedUserId {
             c_1: &randomness * &RISTRETTO_BASEPOINT_TABLE,
-            c_2: message + randomness * self.0,
+            c_2: id_as_point + randomness * self.0,
         }
     }
 }
 
-struct DecryptionShare(RistrettoPoint);
+pub(crate) struct DecryptionShare {
+    identifier: usize,
+    share: RistrettoPoint,
+}
 
-struct Ciphertext {
+pub(crate) struct EncryptedUserId {
     c_1: RistrettoPoint,
     c_2: RistrettoPoint,
 }
 
-impl Ciphertext {
-    fn decrypt_with_shares(
+impl EncryptedUserId {
+    pub(crate) fn decrypt_with_shares(
+        &self,
         shares: &[DecryptionShare; DECRYPTION_THRESHOLD],
     ) -> Result<UserId, Box<dyn Error>> {
-        let mut product = RistrettoPoint::id();
+        let mut sum = RistrettoPoint::identity();
+        for share in shares {
+            sum += share.share * lagrange_coefficient(share.identifier);
+        }
+
+        let user_as_point: RistrettoPoint = sum - self.c_2;
+
+        Ok(user_as_point.into())
     }
 }
 
-// impl DecryptionShare {
-//     fn create(c: Ciphertext, key: RistrettoPoint)
-// }
+fn lagrange_coefficient(identifier: usize) -> Scalar {
+    todo!()
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test() {
+        todo!()
+    }
+}
