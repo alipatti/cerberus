@@ -1,7 +1,9 @@
 // #[warn(clippy::pedantic)]
 
 mod communication;
+mod elgamal;
 pub mod roles;
+mod token;
 
 mod parameters {
     use konst::{primitive::parse_usize, unwrap_ctx};
@@ -27,30 +29,7 @@ mod parameters {
         unwrap_ctx!(parse_usize(env!("CERBERUS_BATCH_SIZE")));
 }
 
-struct UserId(u64);
+pub struct UserId(u64);
+pub type UserPublicKey = [u8; 32]; // TODO
+
 type Batch<T> = [T; parameters::BATCH_SIZE];
-
-mod token {
-    use frost_ristretto255 as frost;
-    use serde::{Deserialize, Serialize};
-    use std::{error::Error, time::SystemTime};
-
-    #[derive(Serialize, Deserialize)]
-    pub struct SignedToken {
-        pub signature: frost::Signature,
-        // TODO fill in the rest
-    }
-
-    #[derive(Serialize, Deserialize)]
-    pub(crate) struct UnsignedToken {
-        timestamp: SystemTime,
-        id_encryption: u32, // TODO
-        pk_e: u32,          // TODO
-    }
-
-    impl SignedToken {
-        pub fn verify(&self) -> Result<(), Box<dyn Error>> {
-            unimplemented!()
-        }
-    }
-}

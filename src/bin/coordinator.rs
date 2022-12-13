@@ -13,5 +13,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // under the hood, this calls the
     let coordinator = Coordinator::init().await?;
 
+    coordinator.
+
     Ok(())
 }

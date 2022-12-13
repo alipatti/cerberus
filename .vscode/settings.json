@@ -1,3 +1,11 @@
 {
-  "cSpell.words": ["actix", "chktex", "elgamal", "healthcheck", "reqwest"]
+  "cSpell.words": [
+    "actix",
+    "chktex",
+    "ciphertexts",
+    "elgamal",
+    "healthcheck",
+    "reqwest",
+    "Ristretto"
+  ]
 }

@@ -2,17 +2,14 @@ use crate::{
     communication as coms,
     parameters::{N_MODERATORS, SIGNING_THRESHOLD},
     token::{SignedToken, UnsignedToken},
-    Batch,
+    Batch, UserId,
 };
-
-use frost::{
-    keys::PublicKeyPackage, round1::SigningCommitments, SigningPackage,
-};
+use frost::{keys::PublicKeyPackage, SigningPackage};
 use frost_ristretto255 as frost;
 use futures::future;
-use rand::rngs::ThreadRng;
+use rand::{rngs::ThreadRng, Rng};
 use serde::{de::DeserializeOwned, Serialize};
-use std::error::Error;
+use std::{error::Error, time::SystemTime};
 
 /// Nonce commitments from from all the moderators. Good for ONE batch of token-signing.
 /// Ordered like `nonce_commitments [moderator_index] [batch_index]`
@@ -33,6 +30,25 @@ enum ModeratorRequest<'a, T> {
 type ModeratorResponses<Res> = [Res; N_MODERATORS];
 
 impl Coordinator {
+    pub async fn create_tokens(
+        &self,
+        user_ids: Batch<UserId>,
+    ) -> Result<Batch<SignedToken>, Box<dyn Error>> {
+        // TODO
+        let mut rng = ThreadRng::default();
+        let unsigned_tokens = array_init::map_array_init(&user_ids, |id| {
+            let mut pk_e = [0u8; 32];
+            rng.fill(&mut pk_e);
+
+            let timestamp = SystemTime::now();
+            let mut elgamal_randomness = [0u8; 32];
+            rng.fill(&mut elgamal_randomness);
+
+            UnsignedToken::new(timestamp, todo!(), pk_e);
+        });
+        self.sign_token_batch(unsigned_tokens).await
+    }
+
     /// Sets up the coordinator and moderators
     ///
     /// Returns a new coordinator object if successful.
@@ -122,8 +138,8 @@ impl Coordinator {
                     bincode::serialize(&unsigned_tokens[token_index])?;
 
                 // collect the signing_commitments for this specific token
-                let signing_commitments: Vec<SigningCommitments> = (0
-                    ..N_MODERATORS)
+                // (use a vector because that's what FROST accepts)
+                let signing_commitments = (0..N_MODERATORS)
                     .map(|moderator_index| {
                         self.nonce_commitments[moderator_index][token_index]
                     })
@@ -151,7 +167,7 @@ impl Coordinator {
             )
             .await?;
 
-        // package the results as a SignedTokenBatch batch
+        // package the results as a SignedToken batch
         let signed_tokens: Batch<SignedToken> = array_init::try_array_init(
             |token_index| -> Result<SignedToken, Box<dyn Error>> {
                 let signature_shares: Vec<_> = moderator_responses
@@ -165,7 +181,10 @@ impl Coordinator {
                     &self.frost_public_key_package,
                 )?;
 
-                Ok(SignedToken { signature })
+                Ok(SignedToken {
+                    signature,
+                    token: todo!(),
+                })
             },
         )?;
 
