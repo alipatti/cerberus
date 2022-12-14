@@ -57,7 +57,7 @@ pub fn run_server() -> Result<()> {
     loop {
         // receive and deserialize request
         let mut request = server.recv().unwrap();
-        println!("Received setup request from coordinator.");
+        println!("Received token request from coordinator.");
 
         let body: communication::signing::Request =
             bincode::deserialize_from(request.as_reader())?;
