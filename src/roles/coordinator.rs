@@ -110,6 +110,7 @@ impl Coordinator {
         Req: Serialize + DeserializeOwned,
         Res: Serialize + DeserializeOwned,
     {
+        // TODO refactor inner closure into its own function
         let payload = &payload;
         array_init::from_iter(
             future::try_join_all((1..=N_MODERATORS).map(|i| async move {

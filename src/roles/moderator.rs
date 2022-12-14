@@ -1,8 +1,9 @@
 use core::panic;
+use std::error::Error;
 
 use crate::{
     communication, communication::signing::SigningRequest, elgamal,
-    parameters::BATCH_SIZE, Batch, Result,
+    parameters::BATCH_SIZE, token::UnsignedToken, Batch, Result,
 };
 use array_init::try_array_init;
 use frost::{
@@ -59,8 +60,12 @@ pub fn run_server() -> Result<()> {
         let mut request = server.recv().unwrap();
         println!("Received token request from coordinator.");
 
-        let body: communication::signing::Request =
-            bincode::deserialize_from(request.as_reader())?;
+        let body: communication::signing::Request = {
+            let mut bytes = Vec::new();
+            let bytes_len = request.as_reader().read_to_end(&mut bytes)?;
+            assert_eq!(request.body_length().unwrap(), bytes_len);
+            bincode::deserialize(&bytes)?
+        };
 
         // do the signing
         let (signature_shares, new_nonce_commitments) =
@@ -153,21 +158,25 @@ impl Moderator {
         signing_request: &SigningRequest,
     ) -> Result<()> {
         // check that the thing being signed really is an encryption of the id being claimed.
+        let deserialized_token: UnsignedToken = {
+            let bytes = signing_request.signing_package.message();
+            bincode::deserialize(bytes)
+                    .map_err::<Box<dyn Error>, _>(|_| "Failed to deserialize unsigned token in moderator signing request.".into())?
+        };
+
         let encryption_matches = {
-            let encryption_claimed = {
-                let bytes = signing_request.signing_package.message();
-                bincode::deserialize(bytes)?
-            };
+            let encryption_claimed = deserialized_token.encryption_of_id;
             let encryption_calculated =
                 self.encryption_keys.group_public.encrypt(
                     &signing_request.user_id,
                     &signing_request.elgamal_randomness,
                 );
 
-            if encryption_calculated == encryption_claimed {
-                Ok(())
-            } else {
-                Err("ID encryption doesn't match what is claimed.".into())
+            match encryption_calculated == encryption_claimed {
+                true => Ok(()),
+                false => {
+                    Err("ID encryption doesn't match what is claimed.".into())
+                }
             }
         };
 

@@ -156,9 +156,5 @@ fn lagrange_coefficient(identifier: usize) -> Scalar {
 
 #[cfg(test)]
 mod tests {
-
-    #[test]
-    fn test() {
-        todo!()
-    }
+    // TODO
 }

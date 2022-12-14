@@ -1,5 +1,7 @@
 // #[warn(clippy::pedantic)]
 
+// TODO create custom error type with more helpful errors
+
 use serde::{Deserialize, Serialize};
 
 mod communication;
