@@ -3,21 +3,3 @@
 
 # annoying macOS files
 .DS_Store
-
-# latex junk
-*.synctex.gz
-*.log
-*.aux
-*.lof
-*.lot
-*.fls
-*.out
-*.toc
-*.fmt
-*.fot
-*.cb
-*.cb2
-.*.lb
-*.bcf
-*.run.xml
-
