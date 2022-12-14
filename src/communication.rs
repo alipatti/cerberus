@@ -5,7 +5,7 @@ pub mod setup {
     use frost_ristretto255 as frost;
     use serde::{Deserialize, Serialize};
 
-    #[derive(Deserialize, Debug, Serialize)]
+    #[derive(Deserialize, Serialize)]
     pub(crate) struct Request {
         pub frost_secret_share: frost::keys::SecretShare,
         pub elgamal_secret_share: elgamal::KeyShare,
@@ -94,7 +94,8 @@ mod tests {
         );
 
         assert_eq!(
-            request.frost_secret_share, should_be_request.frost_secret_share,
+            request.frost_secret_share.value,
+            should_be_request.frost_secret_share.value,
             "Frost secret is not equal to the original."
         );
 
