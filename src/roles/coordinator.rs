@@ -112,12 +112,12 @@ impl Coordinator {
     {
         let payload = &payload;
         array_init::from_iter(
-            future::try_join_all((0..N_MODERATORS).map(|i| async move {
-                let url = format!("http://cerberus-moderator-{}:80/", i + 1);
+            future::try_join_all((1..=N_MODERATORS).map(|i| async move {
+                let url = format!("http://cerberus-moderator-{i}:80/");
                 let body = {
                     let body_struct = match payload {
                         ModeratorRequest::Same(body) => body,
-                        ModeratorRequest::Unique(bodies) => &bodies[i],
+                        ModeratorRequest::Unique(bodies) => &bodies[i - 1], // zero-indexed
                     };
 
                     bincode::serialize(body_struct)?
@@ -127,17 +127,14 @@ impl Coordinator {
 
                 // error on non-200 responses
                 if response.status() != reqwest::StatusCode::OK {
-                    return Err::<Res, Box<dyn Error>>(
-                        format!(
-                            "Received unsuccessful response from moderator {}",
-                            i + 1
-                        )
-                        .into(),
-                    );
+                    return Err(format!(
+                        "Received unsuccessful response from moderator {i}"
+                    )
+                    .into());
                 }
 
-                Ok({
-                    let bytes = response.bytes().await?.to_vec();
+                Ok::<Res, Box<dyn Error>>({
+                    let bytes = response.bytes().await?;
                     let body: Res = bincode::deserialize(&bytes)?;
 
                     body
@@ -154,9 +151,9 @@ impl Coordinator {
     ) -> Result<Batch<SignedToken>> {
         // create signing requests to sent to the moderators
         let signing_requests = self.create_signing_requests(user_ids);
-        let request = coms::signing::Request {
-            signing_requests: signing_requests.clone(),
-        };
+        let signing_requests_backup = signing_requests.clone();
+
+        let request = coms::signing::Request { signing_requests };
 
         // get signature shares from each moderator for all tokens in the batch
         let moderator_responses =
@@ -174,7 +171,8 @@ impl Coordinator {
                     .map(|response| response.signature_shares[i])
                     .collect();
 
-                let signing_package = &signing_requests[i].signing_package;
+                let signing_package =
+                    &signing_requests_backup[i].signing_package;
                 let token = bincode::deserialize(signing_package.message())?;
 
                 let signature = frost::aggregate(
