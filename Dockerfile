@@ -1,6 +1,6 @@
 FROM rust:1.65 AS builder
 
-WORKDIR /usr/src/hecate
+WORKDIR /usr/src/cerberus
 
 # build dependencies first to leverage Docker's caching 
 # (the step will only run when dependencies change)
@@ -18,7 +18,7 @@ RUN cargo build --release
 
 FROM debian:buster-slim AS moderator
 
-COPY  --from=builder usr/src/hecate/target/release/moderator .
+COPY  --from=builder usr/src/cerberus/target/release/moderator .
 CMD ["./moderator"]
 
 FROM debian:buster-slim AS coordinator
@@ -26,5 +26,5 @@ FROM debian:buster-slim AS coordinator
 # instal openssl libraries (required for https communication)
 RUN apt-get update && apt-get install -y libssl-dev
 
-COPY  --from=builder usr/src/hecate/target/release/coordinator .
+COPY  --from=builder usr/src/cerberus/target/release/coordinator .
 CMD ["./coordinator"]
