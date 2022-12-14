@@ -1,16 +1,17 @@
+use std::error::Error;
+
 use crate::{
     parameters::{DECRYPTION_THRESHOLD, N_MODERATORS},
     Result, UserId,
 };
 
-use array_init::array_init;
 use curve25519_dalek::{
     constants::RISTRETTO_BASEPOINT_TABLE, ristretto::RistrettoPoint,
     scalar::Scalar, traits::Identity,
 };
 use rand::rngs::ThreadRng;
 use serde::{Deserialize, Serialize};
-// use vsss_rs::{curve25519::WrappedScalar, Shamir};
+use vsss_rs::{curve25519::WrappedScalar, Shamir};
 
 //  Map between Ristretto point and UserId
 // -----------------------------------------
@@ -25,7 +26,8 @@ impl From<RistrettoPoint> for UserId {
 impl From<&UserId> for RistrettoPoint {
     fn from(val: &UserId) -> Self {
         // TODO implement https://eprint.iacr.org/2013/373.pdf
-        unimplemented!()
+        let mut rng = ThreadRng::default();
+        Self::random(&mut rng)
     }
 }
 
@@ -53,41 +55,42 @@ impl PrivateKey {
     /// (with appropriate Lagrange multipliers) to decrypt a message encoded with
     /// the group key.
     pub(crate) fn create_shares(&self) -> Result<[KeyShare; N_MODERATORS]> {
-        // returning random key shares for now
-        Ok(array_init(|_| {
-            let private = PrivateKey::random();
-            KeyShare {
-                public: private.public(),
-                private,
-                group_public: self.public(),
+        let mut rng = ThreadRng::default();
+
+        let shares_as_bytes = {
+            // weird type conversion between different forks of the same curve25519 library
+            let wrapped_scalar: WrappedScalar =
+                curve25519_dalek_ml::scalar::Scalar::from_canonical_bytes(
+                    self.0.to_bytes(),
+                )
+                .expect("Invalid scalar byte encoding")
+                .into();
+
+            Shamir {
+                n: N_MODERATORS,
+                t: DECRYPTION_THRESHOLD,
             }
-        }))
+            .split_secret(wrapped_scalar, &mut rng)
+            .unwrap()
+        };
 
-        // TODO fix this
-        // let mut rng = ThreadRng::default();
-        //
-        // array_init::from_iter(
-        //     Shamir {
-        //         n: N_MODERATORS,
-        //         t: DECRYPTION_THRESHOLD,
-        //     }
-        //     .split_secret::<WrappedScalar, ThreadRng>(self.0.into(), &mut rng)
-        //     .unwrap()
-        //     .into_iter()
-        //     .map(|share| -> Result<KeyShare> {
-        //         let bytes = share.value().try_into()?;
-        //         let scalar = Scalar::from_canonical_bytes(bytes).unwrap(); // TODO handle error
-        //         let private = PrivateKey(scalar);
+        array_init::from_iter(
+            shares_as_bytes
+                .into_iter()
+                .map(|share| -> Result<KeyShare> {
+                    let bytes = share.value().try_into()?;
+                    let scalar = Scalar::from_canonical_bytes(bytes).unwrap(); // TODO handle error
+                    let private = PrivateKey(scalar);
 
-        //         Ok(KeyShare {
-        //             public: private.public(),
-        //             private,
-        //             group_public: self.public(),
-        //         })
-        //     })
-        //     .collect::<Result<Vec<KeyShare>>>()?,
-        // )
-        // .ok_or_else(|| "Not enough shares".into())
+                    Ok(KeyShare {
+                        public: private.public(),
+                        private,
+                        group_public: self.public(),
+                    })
+                })
+                .collect::<Result<Vec<KeyShare>>>()?,
+        )
+        .ok_or("Not enough shares".into())
     }
 
     pub(crate) fn random() -> Self {
@@ -96,8 +99,8 @@ impl PrivateKey {
     }
 }
 
-#[derive(Serialize, Debug, Deserialize, Clone, PartialEq)]
-pub(crate) struct PublicKey(RistrettoPoint);
+#[derive(Serialize, Debug, Deserialize, Clone, PartialEq, Eq)]
+pub struct PublicKey(RistrettoPoint);
 
 impl PublicKey {
     pub(crate) fn encrypt(
