@@ -1,3 +1,5 @@
+use core::panic;
+
 use crate::{
     communication, communication::signing::SigningRequest, elgamal,
     parameters::BATCH_SIZE, Batch, Result,
@@ -11,7 +13,7 @@ use frost_ristretto255 as frost;
 use rand::rngs::ThreadRng;
 
 pub fn run_server() -> Result<()> {
-    let server = tiny_http::Server::http("0.0.0.0:0").unwrap();
+    let server = tiny_http::Server::http("0.0.0.0:80").unwrap();
 
     // TODO add HTTPS
 
@@ -22,6 +24,7 @@ pub fn run_server() -> Result<()> {
     let mut moderator = {
         // wait for the coordinator to send setup information
         let mut request = server.recv()?;
+        println!("Received setup request from coordinator.");
 
         // deserialize request body
         let body: communication::setup::Request =
@@ -54,6 +57,8 @@ pub fn run_server() -> Result<()> {
     loop {
         // receive and deserialize request
         let mut request = server.recv().unwrap();
+        println!("Received setup request from coordinator.");
+
         let body: communication::signing::Request =
             bincode::deserialize_from(request.as_reader())?;
 

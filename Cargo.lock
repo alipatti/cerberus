@@ -128,7 +128,7 @@ version = "0.1.0"
 dependencies = [
  "array-init",
  "bincode",
- "curve25519-dalek-ml",
+ "curve25519-dalek",
  "frost-core",
  "frost-ristretto255",
  "futures",
@@ -238,7 +238,6 @@ dependencies = [
  "byteorder",
  "digest 0.10.6",
  "rand_core",
- "serde",
  "subtle",
  "zeroize",
 ]
@@ -382,6 +381,7 @@ dependencies = [
 [[package]]
 name = "frost-core"
 version = "0.1.0"
+source = "git+https://github.com/alipatti/frost?branch=add-serde#d2bf9919d0d66822aa5a0b1bd5649c17059e705f"
 dependencies = [
  "byteorder",
  "debugless-unwrap",
@@ -399,6 +399,7 @@ dependencies = [
 [[package]]
 name = "frost-ristretto255"
 version = "0.1.0"
+source = "git+https://github.com/alipatti/frost?branch=add-serde#d2bf9919d0d66822aa5a0b1bd5649c17059e705f"
 dependencies = [
  "curve25519-dalek",
  "frost-core",

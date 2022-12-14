@@ -1,16 +1,16 @@
 use crate::{
     parameters::{DECRYPTION_THRESHOLD, N_MODERATORS},
-    UserId,
+    Result, UserId,
 };
 
+use array_init::array_init;
 use curve25519_dalek::{
     constants::RISTRETTO_BASEPOINT_TABLE, ristretto::RistrettoPoint,
     scalar::Scalar, traits::Identity,
 };
 use rand::rngs::ThreadRng;
 use serde::{Deserialize, Serialize};
-use std::error::Error;
-use vsss_rs::{curve25519::WrappedScalar, Shamir};
+// use vsss_rs::{curve25519::WrappedScalar, Shamir};
 
 //  Map between Ristretto point and UserId
 // -----------------------------------------
@@ -25,32 +25,25 @@ impl From<RistrettoPoint> for UserId {
 impl From<&UserId> for RistrettoPoint {
     fn from(val: &UserId) -> Self {
         // TODO implement https://eprint.iacr.org/2013/373.pdf
-
-        // for now:
-        Self::hash_from_bytes::<sha2::Sha512>(&val.0.to_le_bytes())
+        unimplemented!()
     }
 }
 
 //            Key implementations
 // -----------------------------------------
 
-#[derive(Serialize, Debug, Deserialize, Clone)]
+#[derive(Serialize, Debug, Deserialize, Clone, PartialEq)]
 pub(crate) struct KeyShare {
     pub(crate) private: PrivateKey,
     pub(crate) public: PublicKey,
     pub(crate) group_public: PublicKey,
 }
 
-#[derive(Serialize, Debug, Deserialize, Clone)]
+#[derive(Serialize, Debug, Deserialize, Clone, PartialEq)]
 pub(crate) struct PrivateKey(Scalar);
 
 impl PrivateKey {
-    // is this necessary?
-    fn decrypt(&self, ciphertext: EncryptedUserId) -> UserId {
-        unimplemented!()
-    }
-
-    fn public(&self) -> PublicKey {
+    pub(crate) fn public(&self) -> PublicKey {
         PublicKey(&self.0 * &RISTRETTO_BASEPOINT_TABLE)
     }
 
@@ -59,33 +52,42 @@ impl PrivateKey {
     /// The decryption shares created by the private keys can be added
     /// (with appropriate Lagrange multipliers) to decrypt a message encoded with
     /// the group key.
-    pub(crate) fn create_shares(
-        &self,
-    ) -> Result<[KeyShare; N_MODERATORS], Box<dyn Error>> {
-        let mut rng = ThreadRng::default();
-
-        array_init::from_iter(
-            Shamir {
-                n: N_MODERATORS,
-                t: DECRYPTION_THRESHOLD,
+    pub(crate) fn create_shares(&self) -> Result<[KeyShare; N_MODERATORS]> {
+        // returning random key shares for now
+        Ok(array_init(|_| {
+            let private = PrivateKey::random();
+            KeyShare {
+                public: private.public(),
+                private,
+                group_public: self.public(),
             }
-            .split_secret::<WrappedScalar, ThreadRng>(self.0.into(), &mut rng)
-            .unwrap()
-            .into_iter()
-            .map(|share| {
-                // TODO handle errors
-                let bytes = share.value().try_into().unwrap();
-                let scalar = Scalar::from_canonical_bytes(bytes).unwrap();
-                let private = PrivateKey(scalar);
+        }))
 
-                KeyShare {
-                    public: private.public(),
-                    private,
-                    group_public: self.public(),
-                }
-            }),
-        )
-        .ok_or_else(|| "Not enough shares".into())
+        // TODO fix this
+        // let mut rng = ThreadRng::default();
+        //
+        // array_init::from_iter(
+        //     Shamir {
+        //         n: N_MODERATORS,
+        //         t: DECRYPTION_THRESHOLD,
+        //     }
+        //     .split_secret::<WrappedScalar, ThreadRng>(self.0.into(), &mut rng)
+        //     .unwrap()
+        //     .into_iter()
+        //     .map(|share| -> Result<KeyShare> {
+        //         let bytes = share.value().try_into()?;
+        //         let scalar = Scalar::from_canonical_bytes(bytes).unwrap(); // TODO handle error
+        //         let private = PrivateKey(scalar);
+
+        //         Ok(KeyShare {
+        //             public: private.public(),
+        //             private,
+        //             group_public: self.public(),
+        //         })
+        //     })
+        //     .collect::<Result<Vec<KeyShare>>>()?,
+        // )
+        // .ok_or_else(|| "Not enough shares".into())
     }
 
     pub(crate) fn random() -> Self {
@@ -94,7 +96,7 @@ impl PrivateKey {
     }
 }
 
-#[derive(Serialize, Debug, Deserialize, Clone)]
+#[derive(Serialize, Debug, Deserialize, Clone, PartialEq)]
 pub(crate) struct PublicKey(RistrettoPoint);
 
 impl PublicKey {
@@ -133,7 +135,7 @@ impl EncryptedUserId {
     pub(crate) fn decrypt_with_shares(
         &self,
         shares: &[DecryptionShare; DECRYPTION_THRESHOLD],
-    ) -> Result<UserId, Box<dyn Error>> {
+    ) -> Result<UserId> {
         let mut sum = RistrettoPoint::identity();
         for share in shares {
             sum += share.share * lagrange_coefficient(share.identifier);

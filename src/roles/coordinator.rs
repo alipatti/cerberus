@@ -37,51 +37,6 @@ type ModeratorResponses<Res> = [Res; N_MODERATORS];
 // TODO add documentation
 
 impl Coordinator {
-    fn create_signing_requests(
-        &self,
-        user_ids: &Batch<UserId>,
-    ) -> Batch<SigningRequest> {
-        let mut rng = ThreadRng::default();
-
-        array_init(|i| {
-            let elgamal_randomness = Scalar::random(&mut rng);
-            let user_id = user_ids[i];
-
-            let signing_package = {
-                // create unsigned token struct
-                let token = UnsignedToken {
-                    timestamp: SystemTime::now(),
-                    encryption_of_id: self
-                        .group_public_elgamal_key
-                        .encrypt(&user_id, &elgamal_randomness),
-                    pk_e: [0u8; 32], // TODO make this a real key
-                };
-
-                // serialize the token so it can be passed to frost::sign()
-                let token_bytes = bincode::serialize(&token).unwrap();
-
-                // collect the signing_commitments
-                let signing_commitments = (0..N_MODERATORS)
-                    .map(|moderator_index| {
-                        self.nonce_commitments[moderator_index][i]
-                    })
-                    .collect();
-
-                // create the signing package
-                frost::round2::SigningPackage::new(
-                    signing_commitments,
-                    token_bytes,
-                )
-            };
-
-            SigningRequest {
-                signing_package,
-                elgamal_randomness,
-                user_id,
-            }
-        })
-    }
-
     /// Sets up the coordinator and moderators
     ///
     /// Returns a new coordinator object if successful.
@@ -157,21 +112,36 @@ impl Coordinator {
     {
         let payload = &payload;
         array_init::from_iter(
-            future::try_join_all((1..=N_MODERATORS).map(|i| async move {
-                let url = format!("http://cerberus-moderator-{i}/");
-                let body = match payload {
-                    ModeratorRequest::Same(body) => body,
-                    ModeratorRequest::Unique(bodies) => &bodies[i],
+            future::try_join_all((0..N_MODERATORS).map(|i| async move {
+                let url = format!("http://cerberus-moderator-{}:80/", i + 1);
+                let body = {
+                    let body_struct = match payload {
+                        ModeratorRequest::Same(body) => body,
+                        ModeratorRequest::Unique(bodies) => &bodies[i],
+                    };
+
+                    bincode::serialize(body_struct)?
                 };
 
-                let response = client.get(&url).json(body).send().await?;
+                let response = client.get(&url).body(body).send().await?;
 
                 // error on non-200 responses
                 if response.status() != reqwest::StatusCode::OK {
-                    return Err(<Box<dyn Error>>::from(response.text().await?));
+                    return Err::<Res, Box<dyn Error>>(
+                        format!(
+                            "Received unsuccessful response from moderator {}",
+                            i + 1
+                        )
+                        .into(),
+                    );
                 }
 
-                Ok(response.json().await?)
+                Ok({
+                    let bytes = response.bytes().await?.to_vec();
+                    let body: Res = bincode::deserialize(&bytes)?;
+
+                    body
+                })
             }))
             .await?,
         )
@@ -217,5 +187,50 @@ impl Coordinator {
             })?;
 
         Ok(signed_tokens)
+    }
+
+    fn create_signing_requests(
+        &self,
+        user_ids: &Batch<UserId>,
+    ) -> Batch<SigningRequest> {
+        let mut rng = ThreadRng::default();
+
+        array_init(|i| {
+            let elgamal_randomness = Scalar::random(&mut rng);
+            let user_id = user_ids[i];
+
+            let signing_package = {
+                // create unsigned token struct
+                let token = UnsignedToken {
+                    timestamp: SystemTime::now(),
+                    encryption_of_id: self
+                        .group_public_elgamal_key
+                        .encrypt(&user_id, &elgamal_randomness),
+                    pk_e: [0u8; 32], // TODO make this a real key
+                };
+
+                // serialize the token so it can be passed to frost::sign()
+                let token_bytes = bincode::serialize(&token).unwrap();
+
+                // collect the signing_commitments
+                let signing_commitments = (0..N_MODERATORS)
+                    .map(|moderator_index| {
+                        self.nonce_commitments[moderator_index][i]
+                    })
+                    .collect();
+
+                // create the signing package
+                frost::round2::SigningPackage::new(
+                    signing_commitments,
+                    token_bytes,
+                )
+            };
+
+            SigningRequest {
+                signing_package,
+                elgamal_randomness,
+                user_id,
+            }
+        })
     }
 }

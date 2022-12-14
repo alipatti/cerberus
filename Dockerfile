@@ -10,6 +10,7 @@ RUN cargo build --release
 
 # build app
 COPY src ./src
+COPY .env ./
 RUN cargo build --release
 
 
@@ -20,9 +21,10 @@ FROM debian:buster-slim AS moderator
 COPY  --from=builder usr/src/hecate/target/release/moderator .
 CMD ["./moderator"]
 
-
 FROM debian:buster-slim AS coordinator
 
+# instal openssl libraries (required for https communication)
 RUN apt-get update && apt-get install -y libssl-dev
+
 COPY  --from=builder usr/src/hecate/target/release/coordinator .
 CMD ["./coordinator"]

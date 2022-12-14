@@ -7,7 +7,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Waiting for moderators to spin up their servers...");
     thread::sleep(time::Duration::from_secs(2));
 
-    let coordinator = Coordinator::init().await?;
+    let _coordinator = Coordinator::init().await?;
 
     Ok(())
 }
