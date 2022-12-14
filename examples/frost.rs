@@ -15,7 +15,10 @@ fn main() -> Result<(), frost::Error> {
     let key_packages: HashMap<_, _> = shares
         .into_iter()
         .map(|share| {
-            Ok((share.identifier, frost::keys::KeyPackage::try_from(share)?))
+            Ok::<_, frost::Error>((
+                share.identifier,
+                frost::keys::KeyPackage::try_from(share)?,
+            ))
         })
         .collect::<Result<_, _>>()?;
 
