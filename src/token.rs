@@ -1,4 +1,7 @@
-use crate::{elgamal::EncryptedUserId, UserPublicKey};
+use crate::{
+    elgamal::{self, EncryptedUserId},
+    UserPublicKey,
+};
 use frost_ristretto255 as frost;
 use serde::{Deserialize, Serialize};
 use std::{error::Error, time::SystemTime};
@@ -9,21 +12,18 @@ pub struct SignedToken {
     pub token: UnsignedToken,
 }
 
+impl SignedToken {
+    pub fn verify(
+        &self,
+        public_key: elgamal::PublicKey,
+    ) -> Result<(), Box<dyn Error>> {
+        unimplemented!()
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct UnsignedToken {
     pub(crate) timestamp: SystemTime,
     pub(crate) encryption_of_id: EncryptedUserId,
     pub(crate) pk_e: UserPublicKey,
-}
-
-impl UnsignedToken {
-    pub(crate) fn sign() {
-        unimplemented!()
-    }
-}
-
-impl SignedToken {
-    pub fn verify(&self) -> Result<(), Box<dyn Error>> {
-        unimplemented!()
-    }
 }

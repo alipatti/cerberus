@@ -32,7 +32,7 @@ mod parameters {
 }
 
 #[derive(Deserialize, Serialize, Clone, Copy)]
-pub struct UserId(u64);
+pub struct UserId(pub usize);
 pub type UserPublicKey = [u8; 32]; // TODO
 
 type Batch<T> = [T; parameters::BATCH_SIZE];
