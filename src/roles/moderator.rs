@@ -13,77 +13,7 @@ use frost::{
 use frost_ristretto255 as frost;
 use rand::rngs::ThreadRng;
 
-pub fn run_server() -> Result<()> {
-    let server = tiny_http::Server::http("0.0.0.0:80").unwrap();
-
-    // TODO add HTTPS
-
-    // -------------------------
-    //           SETUP
-    // -------------------------
-
-    let mut moderator = {
-        // wait for the coordinator to send setup information
-        let mut request = server.recv()?;
-        println!("Received setup request from coordinator.");
-
-        // deserialize request body
-        let body: communication::setup::Request =
-            bincode::deserialize_from(request.as_reader())?;
-
-        // verify frost secret share and unwrap key package
-        let frost_key_package =
-            frost::keys::KeyPackage::try_from(body.frost_secret_share)?;
-
-        // create moderator object and nonce commitments
-        let (moderator, nonce_commitments) =
-            Moderator::init(frost_key_package, body.elgamal_secret_share);
-
-        // send response to coordinator
-        request.respond({
-            let body = communication::setup::Response { nonce_commitments };
-            let bytes = bincode::serialize(&body)?;
-
-            tiny_http::Response::from_data(bytes)
-        })?;
-
-        moderator
-    };
-
-    // ---------------------------
-    //           SIGNING
-    // ---------------------------
-
-    // continuously process signing requests
-    loop {
-        // receive and deserialize request
-        let mut request = server.recv().unwrap();
-        println!("Received token request from coordinator.");
-
-        let body: communication::signing::Request = {
-            let mut bytes = Vec::new();
-            let bytes_len = request.as_reader().read_to_end(&mut bytes)?;
-            assert_eq!(request.body_length().unwrap(), bytes_len);
-            bincode::deserialize(&bytes)?
-        };
-
-        // do the signing
-        let (signature_shares, new_nonce_commitments) =
-            moderator.sign_batch(&body.signing_requests)?;
-
-        // send response
-        request.respond({
-            let body = communication::signing::Response {
-                signature_shares,
-                new_nonce_commitments,
-            };
-            let bytes = bincode::serialize(&body)?;
-            tiny_http::Response::from_data(bytes)
-        })?;
-    }
-}
-
-struct Moderator {
+pub struct Moderator {
     // key material
     signing_keys: frost::keys::KeyPackage,
     encryption_keys: elgamal::KeyShare,
@@ -95,7 +25,64 @@ struct Moderator {
 }
 
 impl Moderator {
-    fn init(
+    pub fn run_server() -> Result<()> {
+        let server = tiny_http::Server::http("0.0.0.0:80").unwrap();
+
+        // wait for setup request and handle it.
+        let request = server.recv()?;
+        let mut moderator = Self::new_from_setup_request(request)?;
+
+        // continuously process signing requests
+        loop {
+            let request = server.recv()?;
+            moderator.handle_signing_request(request)?;
+        }
+    }
+
+    fn new_from_setup_request(
+        mut request: tiny_http::Request,
+    ) -> Result<Moderator> {
+        println!("Received setup request from coordinator.");
+        let body: communication::setup::Request =
+            bincode::deserialize_from(request.as_reader())?;
+        let frost_key_package =
+            frost::keys::KeyPackage::try_from(body.frost_secret_share)?;
+        let (moderator, nonce_commitments) =
+            Moderator::new(frost_key_package, body.elgamal_secret_share);
+        request.respond({
+            let body = communication::setup::Response { nonce_commitments };
+            let bytes = bincode::serialize(&body)?;
+
+            tiny_http::Response::from_data(bytes)
+        })?;
+        Ok(moderator)
+    }
+
+    fn handle_signing_request(
+        &mut self,
+        mut request: tiny_http::Request,
+    ) -> Result<()> {
+        println!("Received token request from coordinator.");
+        let body: communication::signing::Request = {
+            let mut bytes = Vec::new();
+            let bytes_len = request.as_reader().read_to_end(&mut bytes)?;
+            assert_eq!(request.body_length().unwrap(), bytes_len);
+            bincode::deserialize(&bytes)?
+        };
+        let (signature_shares, new_nonce_commitments) =
+            self.sign_batch(&body.signing_requests)?;
+        request.respond({
+            let body = communication::signing::Response {
+                signature_shares,
+                new_nonce_commitments,
+            };
+            let bytes = bincode::serialize(&body)?;
+            tiny_http::Response::from_data(bytes)
+        })?;
+        Ok(())
+    }
+
+    fn new(
         signing_keys: frost::keys::KeyPackage,
         encryption_keys: elgamal::KeyShare,
     ) -> (Self, Batch<SigningCommitments>) {
