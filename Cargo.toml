@@ -5,10 +5,14 @@ edition = "2021"
 authors = ["Alistair Pattison <patti041@umn.edu, pattisona@carleton.edu>"]
 
 
+[[bench]]
+name = "token_creation"
+harness = false
+
+
 [dependencies]
 # async 
-# TODO remove unnecessary tokio features
-tokio = { version = "1.22.0", features = ["macros"] }
+tokio = { version = "1.22.0", features = ["macros", "rt"] }
 futures = "0.3.25"
 
 # serialization
@@ -31,11 +35,9 @@ vsss-rs = { version = "2.1.0", features = ["std"] }
 sha2 = "0.10.6"
 rand = "0.8.5"
 # TODO submit PR to FROST with serialization improvements
-# frost-core = { path = "../frost/frost-core" }
-# frost-ristretto255 = { path = "../frost/frost-ristretto255" }
 frost-core = { git = "http://github.com/alipatti/frost", branch = "add-serde" }
 frost-ristretto255 = { git = "http://github.com/alipatti/frost", branch = "add-serde" }
 
-
 # misc
 array-init = "2.1.0"
+criterion = { version = "0.4.0", features = ["async", "tokio", "async_tokio"] }
