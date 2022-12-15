@@ -3,7 +3,7 @@ use std::error::Error;
 
 use crate::{
     communication, communication::signing::SigningRequest, elgamal,
-    parameters::BATCH_SIZE, token::UnsignedToken, Batch, Result,
+    parameters::BATCH_SIZE, token::UnsignedToken, Batch, Coordinator, Result,
 };
 use array_init::try_array_init;
 use frost::{
@@ -25,6 +25,7 @@ pub struct Moderator {
 }
 
 impl Moderator {
+    /// Runs the Moderator's HTTP server.
     pub fn run_server() -> Result<()> {
         let server = tiny_http::Server::http("0.0.0.0:80").unwrap();
 
@@ -39,6 +40,7 @@ impl Moderator {
         }
     }
 
+    /// Creates a new [`Moderator`] object from a [`communication::setup::Request`] sent by the [`Coordinator`].
     fn new_from_setup_request(
         mut request: tiny_http::Request,
     ) -> Result<Moderator> {
@@ -58,6 +60,10 @@ impl Moderator {
         Ok(moderator)
     }
 
+    /// Handles a signing request from the [`Coordinator`].
+    ///
+    /// Under the hood, this...
+    /// TODO finish
     fn handle_signing_request(
         &mut self,
         mut request: tiny_http::Request,
@@ -99,7 +105,7 @@ impl Moderator {
     }
 
     /// Signs a new batch of tokens. This method also internally updates the stored nonces and returns a new batch of commitments.
-    pub(crate) fn sign_batch(
+    fn sign_batch(
         &mut self,
         signing_requests: &Batch<SigningRequest>,
     ) -> Result<(Batch<SignatureShare>, Batch<SigningCommitments>)> {

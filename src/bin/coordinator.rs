@@ -1,5 +1,5 @@
 use array_init::array_init;
-use cerberus::{roles::coordinator::Coordinator, UserId};
+use cerberus::{Coordinator, UserId};
 use std::{error::Error, thread, time};
 
 #[tokio::main(flavor = "current_thread")]

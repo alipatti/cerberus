@@ -16,7 +16,7 @@ use crate::{
 };
 
 /// Nonce commitments from from all the moderators. Good for ONE batch of token-signing.
-/// Ordered like `nonce_commitments [moderator_index] [batch_index]`
+/// Indexed like `commitments [moderator_index] [batch_index]`
 type CommitmentBatch = [Batch<frost::round1::SigningCommitments>; N_MODERATORS];
 
 pub struct Coordinator {

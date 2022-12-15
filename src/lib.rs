@@ -6,8 +6,10 @@ use serde::{Deserialize, Serialize};
 
 mod communication;
 mod elgamal;
-pub mod roles;
+mod roles;
 mod token;
+
+pub use roles::{coordinator::Coordinator, moderator::Moderator};
 
 mod parameters {
     use konst::{primitive::parse_usize, unwrap_ctx};
@@ -39,4 +41,4 @@ pub type UserPublicKey = [u8; 32]; // TODO
 
 type Batch<T> = [T; parameters::BATCH_SIZE];
 
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
