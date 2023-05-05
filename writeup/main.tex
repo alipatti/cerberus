@@ -1,22 +1,165 @@
-\documentclass{article}
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
 
-\usepackage{macros}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{textcomp}
+\usepackage[OT1]{fontenc}
+\usepackage{ali-macros}
+\usepackage{ali-pseudocode}
+\usepackage{ali-crypto}
+\usepackage[colorlinks]{hyperref}
 
+% \usepackage{tikz}
+% \usetikzlibrary{graphs, quotes, graphdrawing, positioning} 
+% \usegdlibrary{layered}
 
-\usepackage{biblatex}
+% \usepackage{cite}
+\usepackage[style=ieee]{biblatex}
 \addbibresource{sources.bib}
+\renewcommand*{\bibfont}{\small}
 
+
+% TODO make better title
+\title{Poster: Committee Moderation on Encrypted Messaging Platforms\thanks{This work was supported by NSF grant 1814753.}}
+
+\author{
+    \IEEEauthorblockN{Alistair Pattison}
+    \IEEEauthorblockA{
+        \textit{University of Minnesota and Carleton College} \\
+        pattisona@carleton.edu
+    } \and
+    \IEEEauthorblockN{Nicholas Hopper}
+    \IEEEauthorblockA{
+        \textit{University of Minnesota} \\
+        hoppernj@umn.edu
+    }
+}
 
 \begin{document}
 
-\input{sections/_abstract.tex}
-\input{sections/intro.tex}
-\input{sections/cerberus.tex}
-\input{sections/implementation.tex}
-\input{sections/conclusion.tex}
+\maketitle
 
-\printbibliography % chktex 1
+\section{Introduction}
 
+Over the past decade, the increased prevalence of mobile computing and a growing desire for privacy have lead to a surge in the use of encrypted messaging services like WhatsApp, Facebook Messenger, and Signal.
+% TODO citation?
+The deniability, anonymity, and security provided by these services are crucial to their widespread adoption, but by construction, these properties make it impossible to hold users accountable for the messages they send.
+With no accountability, these platforms are ripe for abuse, the spread of misinformation \cite{wapo-fake-news-whatsapp}, and election tampering \cite{oxford-computational-propoganda-report}.
+WhatsApp group chats have been used to spread misinformation that has influenced the Brazilian presidential election \cite{pbs-brazil-whatsapp} and even incited the murder of an innocent woman in India \cite{nytimes-whatsapp-india-murder}.
+With no way of identifying or verifying the senders of these messages, little can be done.
+
+These concrete examples and a growing realization that complete anonymity and deniability has consequences have lead to a standoff between governments and messaging services \cite{forbes-iran-whatsapp-ban, bbc-whatsapp-uk}.
+% Iran has already banned the use of WhatsApp , and there's a law pending in the UK that proposes to do the same.
+% Both Signal and WhatsApp executives have stated that they would withdraw from the UK if the bill is passed \cite{bbc-whatsapp-uk}.
+Is there a middle ground that balances accountability with privacy?
+
+Previous works have addressed this concern by allowing a moderator to verify the identity of a message's sender if a message is reported; if not reported, messages maintain all security guarantees.
+However, all known protocols concentrate the power of oversight and moderation to a single individual.
+This is undesirable.
+
+Using primitives from threshold cryptography, this work extends the message-reporting protocol Hecate \cite{hecate} to a setting in which a group of moderators share the responsibility of determining whether a message requires moderating action.
+In this work, we provide examples of why this distributed moderation is desirable, describe its functionality, implement the new protocol in Rust, and benchmark its performance.
+
+\section{Previous Works}
+
+One obvious road to accountability is to to have everyone sign their messages, but this completely destroys the deniability property of the underlying encrypted messaging platform. This is an important feature in many use cases.
+
+\textcite{tglmr} addressed this problem by using a cryptographic primitive that allows signatures to be verified only by one person who is chosen at the time of signing.
+By making the designated verifier a trusted third party (for example, law enforcement or a school principal) and attaching to each message a zero-knowledge proof that the signature is valid, users can be confident that abusive messengers can be held accountable for the messages they send while still preserving deniability against everyone else.
+However, this protocol uses heavy crypto machinery and is quite expensive.
+
+More recent work by \textcite{hecate} introduced a protocol called Hecate that provides the same security guarantees as \textcite{tglmr} but is significantly cheaper in terms of the number of invocations of cryptographic primitives.
+It works by distributing ``tokens'' containing encryptions of senders' identity to the users of a system.
+These tokens are cryptographically bound to messages such that if the message is reported, the moderator can decrypt the token to recover and verify the identity of the original sender.
+To everyone else, the token provides no information.
+
+However, users of the system must trust the moderator to singlehandedly deem whether the message requires intervention and carry out the necessary action.
+By introducing threshold encryption and a committee of $n$ moderators, we modify Hecate to alleviate this issue.
+Following Hecate's tradition of naming protocols after greek mythology, we call our new protocol Cerberus as a reference to the multi-headed dog that guards the underworld.
+
+\section{The Protocol}
+
+In the Hecate protocol, every message sent requires a unique token obtained from the moderator in advance.
+Each token contains (among other things) an encryption of the message-sender's identity,
+\begin{equation}
+	x_1 \ceq \Enc(id_{src}, pk_{mod}),
+\end{equation}
+as well as a single-use ephemeral key pair $(pk_{eph}, sk_{eph})$.
+The token also includes a signature $\sigma_{mod}$ made with the moderators private key that binds the key pair to $x_1$.
+
+When a user sends a message, she consumes a token and attaches the signature
+\begin{equation}
+	\sigma_{src} = \Sign_{sk_{eph}}(x_2)
+	\quad \text{where} \quad
+	x_2 \ceq x_1 \oplus H(m)
+\end{equation}
+to the message along with the original moderator token.
+The signature binds $x_1$ to the sent message, and this metadata is carried with the message throughout its entire forwarding chain.
+If the message is ever reported, the moderator decrypts $x_1$ with his private key to obtain the original sender's identity.
+We direct readers to \textcite{hecate} for a richer description of the protocol and its security.
+
+In our protocol, Cerberus, we modify the process by which $x_1$ is created and decrypted.
+Instead of 1 moderator, there are $n$, and $k$ of them must cooperate to recover $id_{src}$ from $x_1$.
+(These $k$ and $n$ values are tunable parameters.)
+The token-creation process is described below using Elgamal threshold encryption over a group $G$ of order $q$ with generator $g$.
+The moderators' public encryption key is $pk_{mod}$, and the private key is divided into shares $s_1, \ldots, s_n$ using a Shamir sharing scheme \cite{shamir-secret-sharing} and distributed to the moderators.
+Signatures are done with the FROST \cite{frost} signature algorithm, although different threshold schemes could be substituted.
+
+\smallskip
+
+\begin{algorithmic}[1]
+	\function{CreateToken}{$id_{usr}$}{
+		\State Generate $r \gets_\$ \Z_q$ and an an ephemeral keypair $(pk_{eph}, sk_{eph})$.
+		\State Compute $x_1 \ceq \tuple{g^r, \ id_{usr} \oplus H(pk_{mod}^r)}$.
+		\State Package $x_1$ into a token and send a signature request to each moderator along with the randomness $r$.
+		\State Each moderator verifies that $x_1$ is a valid encryption of $id_{src}$ with the provided randomness and returns their signature share on the token.
+		\State Once sufficient responses are receive, combine the signature shares into a valid Schnorr signature $\sigma_{mod}$ and distribute the token containing $x_1$ and the ephemeral keypair.
+	}
+\end{algorithmic}
+
+\smallskip
+
+From here, the token is identical to one in the Hecate protocol \cite{hecate}, and the message is sent and processed as described in that paper.
+To report a message, a user uploads the message $m$ and its metadata to a coordinator who sends out requests for decryption to each moderator.
+If a moderator believes that a message requires intervention, they respond with a decryption share $d_i$ that serves as a vote that the message should be acted upon.
+If more than $k$ decryption shares are received, one can recover the identity of the sender, $id_{src}$; if there are insufficient responses, $id_{src}$ remains hidden.
+
+\smallskip
+
+\begin{algorithmic}[1]
+	\function{HandleReport}{$m$, $x_1$}{
+	\State A coordinator sends a request to all $n$ moderators containing the reported message $m$ and the encrypted id, $x_1 = \tuple{c_1, c_2}$.
+	\State Each moderator verifies the signatures and the well-formedness of the report. If the moderator believes that the message is worth acting upon, she responds with the decryption share $d_i \ceq c_1^{s_i}$.
+	\State If enough decryption shares are received, the coordinator multiplies together $k + 1$ decryption shares with appropriate Lagrange coefficients $\lambda_i \ceq \prod_{j \neq i} \frac{j}{j - i}$ to obtain
+	\begin{equation}
+		id_{usr}
+		= H \paren{\prod_i d_i^{\lambda_i}} \oplus c_2.
+	\end{equation}
+	}
+\end{algorithmic}
+
+\section{Benchmarks}
+
+\textcite{hecate} includes an implementation and benchmark of the whole message cycle (token creation, message sending, message receipt, and message reporting), so we focus on the modified portions of the protocol: token creation and message reporting.
+We implement these steps in Rust and run each party in a separate linux container communicating over HTTP.
+We do not have complete benchmark results yet, but we will for the final version.
+Code is available on github \cite{cerberus-github}.
+
+% TODO introduce implementation, docker setup, crypto primitives used, ristretto field, etc.
+
+% TODO benchmark over number of moderators, encryption threshold, batch size
+
+% \section{Conclusions and Future Direction}
+
+% We close by describing situation in which our group moderation scheme is preferable to one with a single moderator.
+
+% ----------------
+% -- CITATIONS ---
+% ----------------
+
+\printbibliography
+% \bibliographystyle{IEEEtran}
+% \bibliography{sources}
 
 \end{document}
 
