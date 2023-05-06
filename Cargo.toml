@@ -41,3 +41,4 @@ frost-ristretto255 = { git = "http://github.com/alipatti/frost", branch = "add-s
 # misc
 array-init = "2.1.0"
 criterion = { version = "0.4.0", features = ["async", "tokio", "async_tokio"] }
+chrono = "0.4.24"
