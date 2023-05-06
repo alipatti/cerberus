@@ -1,6 +1,6 @@
 use crate::{
     parameters::{DECRYPTION_THRESHOLD, N_MODERATORS},
-    UserId,
+    Result, UserId,
 };
 
 use array_init::array_init;
@@ -27,7 +27,7 @@ pub struct PublicKey(RistrettoPoint);
 
 /// An ElGamal encryption of a
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
-pub(crate) struct EncryptedUserId {
+pub struct EncryptedUserId {
     c_1: RistrettoPoint,
     c_2: [u8; 32],
 }
@@ -35,7 +35,8 @@ pub(crate) struct EncryptedUserId {
 /// Wrapper for a decryption shares `(x, d)` where `d = f(x) * c_1` is
 /// the product of the Shamir secret share and the the first entry
 /// of the ElGamal ciphertext tuple, `c_1`.
-pub(crate) struct DecryptionShare(Scalar, RistrettoPoint);
+#[derive(Deserialize, Serialize)]
+pub struct DecryptionShare(Scalar, RistrettoPoint);
 
 impl PublicKey {
     pub(crate) fn encrypt(
@@ -77,12 +78,12 @@ impl KeyShare {
 }
 
 impl EncryptedUserId {
-    fn decrypt_with_shares(
+    pub fn decrypt_with_shares(
         &self,
         shares: &[DecryptionShare],
-    ) -> Option<UserId> {
+    ) -> Result<UserId> {
         if shares.len() != DECRYPTION_THRESHOLD {
-            return None; // wrong number of shares
+            return Err("Wrong number of shares".into()); // wrong number of shares
         }
 
         // TODO: extract this into a separate function
@@ -102,7 +103,7 @@ impl EncryptedUserId {
         let decrypted_id =
             UserId(xor_bytes(&decryption_share_bytes, &self.c_2));
 
-        Some(decrypted_id)
+        Ok(decrypted_id)
     }
 }
 
@@ -188,7 +189,7 @@ mod tests {
 
         let id_decrypted = x_1.decrypt_with_shares(&decryption_shares);
 
-        assert!(id_decrypted.is_some(), "Unable to decrypt id");
+        assert!(id_decrypted.is_ok(), "Unable to decrypt id");
 
         assert_eq!(id, id_decrypted.unwrap(), "Decrypted id is incorrect");
     }

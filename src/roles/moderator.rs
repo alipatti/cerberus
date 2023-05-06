@@ -11,6 +11,7 @@ use frost::{
     round2::SignatureShare,
 };
 use frost_ristretto255 as frost;
+use futures::future::ok;
 
 pub struct Moderator {
     // key material
@@ -30,12 +31,24 @@ impl Moderator {
 
         // wait for setup request and handle it.
         let request = server.recv()?;
+        assert_eq!(
+            request.url(),
+            "/setup",
+            "First request to moderator was not a setup request"
+        );
         let mut moderator = Self::new_from_setup_request(request)?;
 
-        // continuously process signing requests
+        println!("Setup successful.");
+
+        // continuously process signing and decryption requests from
+        // the coordinator
         loop {
             let request = server.recv()?;
-            moderator.handle_signing_request(request)?;
+            match request.url() {
+                "/signing" => moderator.handle_signing(request)?,
+                "/decryption" => moderator.handle_decryption(request)?,
+                other => println!("Invalid endpoint: {other}"),
+            }
         }
     }
 
@@ -43,42 +56,41 @@ impl Moderator {
     fn new_from_setup_request(
         mut request: tiny_http::Request,
     ) -> Result<Moderator> {
-        println!("Received setup request from coordinator.");
+        // println!("Received setup request from coordinator.");
 
+        // deserialize request body
         let body: communication::setup::Request =
             bincode::deserialize_from(request.as_reader())?;
 
+        // unpack the FROST key package
         let frost_key_package =
             frost::keys::KeyPackage::try_from(body.frost_secret_share)?;
 
+        // create `Moderator` object and the first batch of FROST nonce commitments
         let (moderator, nonce_commitments) =
             Moderator::new(frost_key_package, body.elgamal_secret_share);
 
-        let response = {
+        // send response back to coordinator
+        request.respond({
             let body = communication::setup::Response { nonce_commitments };
             let bytes = bincode::serialize(&body)?;
 
             tiny_http::Response::from_data(bytes)
-        };
-        request.respond(response)?;
+        })?;
         Ok(moderator)
     }
 
     /// Handles a signing request from the [`Coordinator`].
     ///
     /// Under the hood, this...
-    /// TODO finish
-    fn handle_signing_request(
+    /// TODO finish documentation
+    fn handle_signing(
         &mut self,
         mut request: tiny_http::Request,
     ) -> Result<()> {
-        println!("Received token request from coordinator.");
-        let body: communication::signing::Request = {
-            let mut bytes = Vec::new();
-            let bytes_len = request.as_reader().read_to_end(&mut bytes)?;
-            assert_eq!(request.body_length().unwrap(), bytes_len);
-            bincode::deserialize(&bytes)?
-        };
+        // println!("Received token request from coordinator.");
+        let body: communication::signing::Request =
+            bincode::deserialize_from(request.as_reader())?;
 
         let (signature_shares, new_nonce_commitments) =
             self.sign_batch(&body.signing_requests)?;
@@ -167,7 +179,7 @@ impl Moderator {
         };
 
         let encryption_matches = {
-            let encryption_claimed = deserialized_token.encryption_of_id;
+            let encryption_claimed = deserialized_token.x_1;
             let encryption_calculated = self.encryption_keys.encrypt(
                 &signing_request.user_id,
                 &signing_request.elgamal_randomness,
@@ -213,5 +225,22 @@ impl Moderator {
             nonces.try_into().unwrap_or_else(|_| panic!()),
             commitments.try_into().unwrap_or_else(|_| panic!()),
         )
+    }
+
+    fn handle_decryption(&self, mut request: tiny_http::Request) -> Result<()> {
+        let body: communication::decryption::Request =
+            bincode::deserialize_from(request.as_reader())?;
+
+        // TODO: verify well-formed-ness of the report
+
+        let decryption_share = self.encryption_keys.decryption_share(&body.x_1);
+
+        request.respond({
+            let body = communication::decryption::Response { decryption_share };
+            let bytes = bincode::serialize(&body)?;
+            tiny_http::Response::from_data(bytes)
+        })?;
+
+        Ok(())
     }
 }

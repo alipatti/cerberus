@@ -29,21 +29,21 @@ pub mod signing {
     use serde::{Deserialize, Serialize};
 
     #[derive(Deserialize, Serialize)]
-    pub(crate) struct Request {
+    pub struct Request {
         #[serde(with = "serde_arrays")]
-        pub(crate) signing_requests: Batch<SigningRequest>,
+        pub signing_requests: Batch<SigningRequest>,
     }
 
     #[derive(Deserialize, Serialize)]
-    pub(crate) struct Response {
+    pub struct Response {
         #[serde(with = "serde_arrays")]
-        pub(crate) signature_shares: Batch<SignatureShare>,
+        pub signature_shares: Batch<SignatureShare>,
         #[serde(with = "serde_arrays")]
-        pub(crate) new_nonce_commitments: Batch<SigningCommitments>,
+        pub new_nonce_commitments: Batch<SigningCommitments>,
     }
 
     #[derive(Deserialize, Serialize, Clone)]
-    pub(crate) struct SigningRequest {
+    pub struct SigningRequest {
         pub(crate) signing_package: SigningPackage,
 
         /// Used to verify the well-formedness of the signing package.
@@ -51,6 +51,26 @@ pub mod signing {
 
         /// The user ID to be encrypted.
         pub(crate) user_id: UserId,
+    }
+}
+
+pub mod decryption {
+    use serde::{Deserialize, Serialize};
+
+    use crate::elgamal::{DecryptionShare, EncryptedUserId};
+
+    #[derive(Deserialize, Serialize)]
+    pub struct Request {
+        pub message: Vec<u8>,
+        pub x_1: EncryptedUserId,
+        // TODO: add the remainder of the stuff that goes here:
+        // - signatures, commitments, etc.
+    }
+
+    #[derive(Deserialize, Serialize)]
+    pub struct Response {
+        pub(crate) decryption_share: DecryptionShare,
+        // TODO is there more that we need here?
     }
 }
 
