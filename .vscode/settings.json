@@ -2,10 +2,12 @@
   "cSpell.words": [
     "actix",
     "chktex",
+    "ciphertext",
     "ciphertexts",
-    "elgamal",
+    "ElGamal",
     "healthcheck",
     "reqwest",
-    "Ristretto"
+    "Ristretto",
+    "Shamir"
   ]
 }
