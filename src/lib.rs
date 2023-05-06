@@ -36,7 +36,7 @@ mod parameters {
 }
 
 /// Wrapper type for an
-#[derive(Deserialize, Serialize, Clone, Copy, PartialEq, Debug)]
+#[derive(Deserialize, Serialize, Clone, Copy, PartialEq, Eq, Debug)]
 pub struct UserId([u8; 32]);
 
 impl UserId {
@@ -51,6 +51,8 @@ pub type UserPublicKey = [u8; 32];
 /// Wrapper type for a constant-length array representing a single batch
 /// of something in the protocol, e.g., a batch of signature shares
 /// sent by a moderator to the coordinator.
+// TODO change this to heap-allocated memory.
+// we get stack overflow with too large of batch sizes
 type Batch<T> = [T; parameters::BATCH_SIZE];
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;

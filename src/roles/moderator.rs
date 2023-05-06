@@ -11,7 +11,6 @@ use frost::{
     round2::SignatureShare,
 };
 use frost_ristretto255 as frost;
-use futures::future::ok;
 
 pub struct Moderator {
     // key material

@@ -1,11 +1,10 @@
-use std::{error::Error, time::SystemTime};
+use std::error::Error;
 
 use array_init::array_init;
 use chrono::Utc;
 use curve25519_dalek::scalar::Scalar;
 use frost_ristretto255 as frost;
 use futures::future;
-use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{

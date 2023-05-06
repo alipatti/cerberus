@@ -15,7 +15,7 @@ pub struct SignedToken {
 impl SignedToken {
     pub fn verify(
         &self,
-        public_key: elgamal::PublicKey,
+        _public_key: elgamal::PublicKey,
     ) -> Result<(), Box<dyn Error>> {
         unimplemented!()
     }
