@@ -4,6 +4,8 @@
 # annoying macOS files
 .DS_Store
 
+# IEEE latex class file
+writeup/IEEEtran.cls
 
 # -----------------------------
 # -- DEFAULT LATEX GITIGNORE -- 
