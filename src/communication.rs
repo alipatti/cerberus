@@ -45,9 +45,11 @@ pub mod signing {
     #[derive(Deserialize, Serialize, Clone)]
     pub(crate) struct SigningRequest {
         pub(crate) signing_package: SigningPackage,
+
         /// Used to verify the well-formedness of the signing package.
         pub(crate) elgamal_randomness: Scalar,
-        /// Used to verify the well-formedness of the signing package.
+
+        /// The user ID to be encrypted.
         pub(crate) user_id: UserId,
     }
 }
@@ -59,31 +61,30 @@ mod tests {
         setup,
         signing::{self, SigningRequest},
     };
-    use crate::{elgamal, parameters::N_MODERATORS, Result, UserId};
+    use crate::{
+        elgamal::generate_private_key_shares, parameters::N_MODERATORS, Result,
+        UserId,
+    };
     use array_init::array_init;
     use curve25519_dalek::scalar::Scalar;
-    use frost::{round1::SigningCommitments, Identifier, SigningPackage};
+    use frost::{Identifier, SigningPackage};
     use frost_core::frost::keys::SigningShare;
     use frost_ristretto255 as frost;
-    use rand::{thread_rng, Rng};
+    use rand::Rng;
 
     #[test]
-    fn test_setup_serde() -> Result<()> {
+    fn test_setup_serialization() -> Result<()> {
+        let mut rng = rand::thread_rng();
+
         let frost_secret_share = {
-            let (shares, _) =
-                frost::keys::keygen_with_dealer(5, 3, &mut thread_rng())?;
+            let (shares, _) = frost::keys::keygen_with_dealer(5, 3, &mut rng)?;
 
             shares[0].to_owned()
         };
 
         let elgamal_secret_share = {
-            let private = elgamal::PrivateKey::random();
-            let public = private.public();
-            elgamal::KeyShare {
-                group_public: public.clone(),
-                public,
-                private,
-            }
+            let (_, shares) = generate_private_key_shares(&mut rng);
+            shares[0].to_owned()
         };
 
         let request = setup::Request {
@@ -111,9 +112,9 @@ mod tests {
     }
 
     #[test]
-    fn test_signing_serde() -> Result<()> {
+    fn test_signing_serialization() -> Result<()> {
         // make dummy data
-        let mut rng = thread_rng();
+        let mut rng = rand::thread_rng();
         let signing_requests = array_init(|_i| {
             let signing_commitments = (0..N_MODERATORS)
                 .map(|i| {
@@ -148,6 +149,11 @@ mod tests {
             let bytes = bincode::serialize(&request)?;
             bincode::deserialize(&bytes)?
         };
+
+        assert_eq!(
+            request.signing_requests[0].elgamal_randomness,
+            should_be_request.signing_requests[0].elgamal_randomness
+        );
 
         Ok(())
     }

@@ -1,5 +1,6 @@
 use array_init::array_init;
 use cerberus::{Coordinator, UserId};
+use rand::{rngs::ThreadRng, thread_rng};
 use std::{error::Error, thread, time};
 
 #[tokio::main(flavor = "current_thread")]
@@ -15,7 +16,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // request tokens
     println!("Requesting a batch of tokens...");
-    let user_ids = array_init(UserId);
+    let mut rng = thread_rng();
+    let user_ids = array_init(|_| UserId::random(&mut rng));
     let _tokens = coordinator.create_tokens(&user_ids).await?;
     println!("Successfully signed tokens!");
 

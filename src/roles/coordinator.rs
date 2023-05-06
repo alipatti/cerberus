@@ -4,7 +4,6 @@ use array_init::array_init;
 use curve25519_dalek::scalar::Scalar;
 use frost_ristretto255 as frost;
 use futures::future;
-use rand::rngs::ThreadRng;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
@@ -64,7 +63,7 @@ impl Coordinator {
         elgamal::PublicKey,
         CommitmentBatch,
     )> {
-        let mut rng = ThreadRng::default();
+        let mut rng = rand::thread_rng();
 
         let (frost_secret_shares, frost_public_key) =
             frost::keys::keygen_with_dealer(
@@ -73,13 +72,8 @@ impl Coordinator {
                 &mut rng,
             )?;
 
-        let (elgamal_public_key, elgamal_key_shares) = {
-            let private_key = elgamal::PrivateKey::random();
-            let shares = private_key.create_shares()?;
-            let public_key: elgamal::PublicKey = (&private_key).into();
-
-            (public_key, shares)
-        };
+        let (elgamal_public_key, elgamal_key_shares) =
+            elgamal::generate_private_key_shares(&mut rng);
 
         let request_bodies = array_init(|i| coms::setup::Request {
             frost_secret_share: frost_secret_shares[i].clone(),
@@ -99,6 +93,7 @@ impl Coordinator {
 
         Ok((frost_public_key, elgamal_public_key, nonce_commitments))
     }
+
     /// Sends a query to every moderator at the provided endpoint and with the provided body.
     ///
     /// Returns an array of type [`Res`; [`N_MODERATORS`]]
@@ -192,7 +187,7 @@ impl Coordinator {
         &self,
         user_ids: &Batch<UserId>,
     ) -> Batch<SigningRequest> {
-        let mut rng = ThreadRng::default();
+        let mut rng = rand::thread_rng();
 
         array_init(|i| {
             let elgamal_randomness = Scalar::random(&mut rng);

@@ -3,7 +3,7 @@ use std::error::Error;
 
 use crate::{
     communication, communication::signing::SigningRequest, elgamal,
-    parameters::BATCH_SIZE, token::UnsignedToken, Batch, Coordinator, Result,
+    parameters::BATCH_SIZE, token::UnsignedToken, Batch, Result,
 };
 use array_init::try_array_init;
 use frost::{
@@ -11,11 +11,10 @@ use frost::{
     round2::SignatureShare,
 };
 use frost_ristretto255 as frost;
-use rand::rngs::ThreadRng;
 
 pub struct Moderator {
     // key material
-    signing_keys: frost::keys::KeyPackage,
+    sk_signing: frost::keys::KeyPackage,
     encryption_keys: elgamal::KeyShare,
 
     /// The next batch of nonces to use
@@ -45,18 +44,23 @@ impl Moderator {
         mut request: tiny_http::Request,
     ) -> Result<Moderator> {
         println!("Received setup request from coordinator.");
+
         let body: communication::setup::Request =
             bincode::deserialize_from(request.as_reader())?;
+
         let frost_key_package =
             frost::keys::KeyPackage::try_from(body.frost_secret_share)?;
+
         let (moderator, nonce_commitments) =
             Moderator::new(frost_key_package, body.elgamal_secret_share);
-        request.respond({
+
+        let response = {
             let body = communication::setup::Response { nonce_commitments };
             let bytes = bincode::serialize(&body)?;
 
             tiny_http::Response::from_data(bytes)
-        })?;
+        };
+        request.respond(response)?;
         Ok(moderator)
     }
 
@@ -75,8 +79,10 @@ impl Moderator {
             assert_eq!(request.body_length().unwrap(), bytes_len);
             bincode::deserialize(&bytes)?
         };
+
         let (signature_shares, new_nonce_commitments) =
             self.sign_batch(&body.signing_requests)?;
+
         request.respond({
             let body = communication::signing::Response {
                 signature_shares,
@@ -85,6 +91,7 @@ impl Moderator {
             let bytes = bincode::serialize(&body)?;
             tiny_http::Response::from_data(bytes)
         })?;
+
         Ok(())
     }
 
@@ -96,7 +103,7 @@ impl Moderator {
 
         (
             Self {
-                signing_keys,
+                sk_signing: signing_keys,
                 nonces,
                 encryption_keys,
             },
@@ -116,7 +123,7 @@ impl Moderator {
 
         // create new nonces
         let (new_nonces, new_commitments) =
-            Moderator::generate_nonces(&self.signing_keys);
+            Moderator::generate_nonces(&self.sk_signing);
 
         // store the secrets, and return the new commitments alongside the signatures
         self.nonces = new_nonces;
@@ -140,7 +147,7 @@ impl Moderator {
         frost::round2::sign(
             &signing_request.signing_package,
             nonces,
-            &self.signing_keys,
+            &self.sk_signing,
         )
         // deal with special frost error type
         .map_err(|_| "Failed to create signature share".into())
@@ -150,20 +157,21 @@ impl Moderator {
         &self,
         signing_request: &SigningRequest,
     ) -> Result<()> {
-        // check that the thing being signed really is an encryption of the id being claimed.
+        // check that the thing being signed really is an encryption of
+        // the claimed UserId with the claimed randomness
         let deserialized_token: UnsignedToken = {
             let bytes = signing_request.signing_package.message();
             bincode::deserialize(bytes)
-                    .map_err::<Box<dyn Error>, _>(|_| "Failed to deserialize unsigned token in moderator signing request.".into())?
+                    .map_err::<Box<dyn Error>, _>(
+                        |_| "Failed to deserialize unsigned token in moderator signing request.".into())?
         };
 
         let encryption_matches = {
             let encryption_claimed = deserialized_token.encryption_of_id;
-            let encryption_calculated =
-                self.encryption_keys.group_public.encrypt(
-                    &signing_request.user_id,
-                    &signing_request.elgamal_randomness,
-                );
+            let encryption_calculated = self.encryption_keys.encrypt(
+                &signing_request.user_id,
+                &signing_request.elgamal_randomness,
+            );
 
             match encryption_calculated == encryption_claimed {
                 true => Ok(()),
@@ -182,7 +190,7 @@ impl Moderator {
     fn generate_nonces(
         frost_keys: &frost::keys::KeyPackage,
     ) -> (Batch<SigningNonces>, Batch<SigningCommitments>) {
-        let mut rng = ThreadRng::default();
+        let mut rng = rand::thread_rng();
 
         // allocate vectors
         let mut nonces = Vec::with_capacity(BATCH_SIZE);
@@ -200,7 +208,7 @@ impl Moderator {
         }
 
         // cast vectors into array
-        // hacky unwrap because FROST struct isn't Debug
+        // requires a hacky unwrap because the FROST structs aren't Debug
         (
             nonces.try_into().unwrap_or_else(|_| panic!()),
             commitments.try_into().unwrap_or_else(|_| panic!()),

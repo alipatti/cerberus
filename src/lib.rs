@@ -1,7 +1,6 @@
 // #[warn(clippy::pedantic)]
 
-// TODO create custom error type with more helpful errors
-
+use rand::{CryptoRng, Rng, RngCore};
 use serde::{Deserialize, Serialize};
 
 mod communication;
@@ -11,6 +10,7 @@ mod token;
 
 pub use roles::{coordinator::Coordinator, moderator::Moderator};
 
+/// Protocol hyperparameters
 mod parameters {
     use konst::{primitive::parse_usize, unwrap_ctx};
 
@@ -35,10 +35,22 @@ mod parameters {
         unwrap_ctx!(parse_usize(env!("CERBERUS_BATCH_SIZE")));
 }
 
-#[derive(Deserialize, Serialize, Clone, Copy)]
-pub struct UserId(pub usize);
-pub type UserPublicKey = [u8; 32]; // TODO
+/// Wrapper type for an
+#[derive(Deserialize, Serialize, Clone, Copy, PartialEq, Debug)]
+pub struct UserId([u8; 32]);
 
+impl UserId {
+    pub fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
+        Self(rng.gen())
+    }
+}
+
+// TODO
+pub type UserPublicKey = [u8; 32];
+
+/// Wrapper type for a constant-length array representing a single batch
+/// of something in the protocol, e.g., a batch of signature shares
+/// sent by a moderator to the coordinator.
 type Batch<T> = [T; parameters::BATCH_SIZE];
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;

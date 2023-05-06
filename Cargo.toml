@@ -5,9 +5,9 @@ edition = "2021"
 authors = ["Alistair Pattison <patti041@umn.edu, pattisona@carleton.edu>"]
 
 
-[[bench]]
-name = "token_creation"
-harness = false
+# [[bench]]
+# name = "token_creation"
+# harness = false
 
 
 [dependencies]

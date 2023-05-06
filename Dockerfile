@@ -2,14 +2,14 @@ FROM rust:1.65 AS builder
 
 WORKDIR /usr/src/cerberus
 
-# build dependencies first to leverage Docker's caching 
-# (the step will only run when dependencies change)
+# -- build dependencies -- 
+# this leverages Docker's caching and will only run when dependencies change
 RUN cargo init
 COPY Cargo.toml Cargo.lock ./
 RUN cargo build
 # RUN cargo build --release
 
-# build app
+# -- build app -- 
 COPY src ./src
 COPY .env ./
 RUN cargo build
@@ -20,7 +20,7 @@ RUN cargo build
 
 FROM debian:buster-slim AS moderator
 
-# instal openssl libraries (required for https communication)
+# instal openssl libraries
 RUN apt-get update && apt-get install -y libssl-dev
 
 COPY  --from=builder usr/src/cerberus/target/debug/moderator .
