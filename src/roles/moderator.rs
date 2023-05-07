@@ -133,11 +133,12 @@ impl Moderator {
     ) -> Result<(Batch<SignatureShare>, Batch<SigningCommitments>)> {
         //  create signatures
         let mut signatures = Vec::with_capacity(self.batch_size);
-        for i in 0..self.batch_size {
-            signatures.push(self.process_signing_request(
-                &signing_requests[i],
-                &self.nonces[i],
-            )?)
+
+        for (signing_request, nonce) in
+            signing_requests.iter().zip(&self.nonces)
+        {
+            signatures
+                .push(self.process_signing_request(signing_request, nonce)?)
         }
 
         // create new nonces

@@ -187,9 +187,8 @@ impl Coordinator {
         let mut rng = rand::thread_rng();
 
         let mut requests = Vec::with_capacity(self.batch_size);
-        for i in 0..self.batch_size {
+        for (i, user_id) in user_ids.iter().enumerate() {
             let elgamal_randomness = Scalar::random(&mut rng);
-            let user_id = user_ids[i];
 
             let signing_package = {
                 // create unsigned token struct
@@ -197,7 +196,7 @@ impl Coordinator {
                     timestamp: Utc::now().timestamp(),
                     x_1: self
                         .group_public_elgamal_key
-                        .encrypt(&user_id, &elgamal_randomness),
+                        .encrypt(user_id, &elgamal_randomness),
                     pk_e: [0u8; 32], // TODO make this a real key
                 };
 
@@ -221,7 +220,7 @@ impl Coordinator {
             requests.push(communication::signing::SigningRequest {
                 signing_package,
                 elgamal_randomness,
-                user_id,
+                user_id: user_id.to_owned(),
             })
         }
 
