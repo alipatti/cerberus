@@ -22,10 +22,8 @@ pub struct Moderator {
 }
 
 impl Moderator {
-    /// Runs the Moderator's HTTP server.
-    pub fn run_server() -> Result<()> {
-        let server = tiny_http::Server::http("0.0.0.0:80").unwrap();
-
+    /// Runs the Moderator's HTTP server until it receives a shutdown request.
+    pub fn run_server(server: &tiny_http::Server) -> Result<()> {
         // wait for setup request and handle it.
         let request = server.recv()?;
         assert_eq!(
@@ -38,12 +36,17 @@ impl Moderator {
         println!("Setup successful.");
 
         // continuously process signing and decryption requests from
-        // the coordinator
+        // the coordinator until shutdown request is received
         loop {
             let request = server.recv()?;
             match request.url() {
                 "/signing" => moderator.handle_signing(request)?,
                 "/decryption" => moderator.handle_decryption(request)?,
+                "/shutdown" => {
+                    request.respond(tiny_http::Response::empty(200))?;
+                    println!("Shutdown successful.");
+                    break Ok(());
+                }
                 other => println!("Invalid endpoint: {other}"),
             }
         }

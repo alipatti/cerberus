@@ -124,6 +124,7 @@ impl Coordinator {
         // package the results as a SignedToken batch
         let mut signed_tokens = Vec::with_capacity(self.batch_size);
 
+        // TODO make the linter stop complaining about this
         for i in 0..self.batch_size {
             let signature_shares: Vec<_> = moderator_responses
                 .iter()
@@ -225,6 +226,22 @@ impl Coordinator {
         }
 
         requests
+    }
+
+    pub async fn shutdown_moderators(&self) -> Result<()> {
+        future::try_join_all((1..=N_MODERATORS).map(|i| async move {
+            let url = format!("http://cerberus-moderator-{i}:80/shutdown");
+            let response = self.client.get(&url).send().await?;
+
+            if response.status() == 200 {
+                Ok::<(), Box<dyn Error>>(())
+            } else {
+                Err(format!("Failed to shutdown moderator {i}").into())
+            }
+        }))
+        .await?;
+
+        Ok(())
     }
 }
 

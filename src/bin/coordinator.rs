@@ -8,7 +8,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let batch_size = 100;
 
     println!("Waiting for moderators to spin up their servers...");
-    thread::sleep(time::Duration::from_millis(500));
+    thread::sleep(time::Duration::from_millis(1000));
 
     // setup moderators
     println!("Initializing moderators...");
@@ -31,11 +31,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Requesting decryption shares...");
     let decrypted_user_id =
         coordinator.request_token_decryption(&tokens[0]).await?;
+
     assert_eq!(
         user_ids[0], decrypted_user_id,
         "Decrypted user ID is incorrect."
     );
     println!("Successfully decrypted token!");
+
+    // shut down moderators
+    println!("Shutting down moderators...");
+    coordinator.shutdown_moderators().await?;
+
+    // start them back up again to make sure it works
+    println!("Initializing moderators for the second time...");
+    Coordinator::init(batch_size).await?;
+    println!("Successfully setup moderators for the second time!");
 
     Ok(())
 }
