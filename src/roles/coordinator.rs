@@ -1,6 +1,5 @@
 use std::error::Error;
 
-use array_init::array_init;
 use chrono::Utc;
 use curve25519_dalek::scalar::Scalar;
 use frost_ristretto255 as frost;
@@ -9,14 +8,13 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     communication, elgamal,
-    parameters::{DECRYPTION_THRESHOLD, N_MODERATORS, SIGNING_THRESHOLD},
     token::{SignedToken, UnsignedToken},
     Batch, Result, UserId,
 };
 
 /// Nonce commitments from from all the moderators. Good for ONE batch of token-signing.
 /// Indexed like `commitments [moderator_index] [batch_index]`
-type CommitmentBatch = [Batch<frost::round1::SigningCommitments>; N_MODERATORS];
+type CommitmentBatch = Vec<Batch<frost::round1::SigningCommitments>>;
 
 pub struct Coordinator {
     pub(crate) frost_public_key_package: frost::keys::PublicKeyPackage,
@@ -25,34 +23,56 @@ pub struct Coordinator {
 
     nonce_commitments: CommitmentBatch,
 
+    // parameters
     batch_size: usize,
+    n_moderators: usize,
+    decryption_threshold: usize,
+    signing_threshold: usize,
 }
 
+/// Enum representing whether or not the requests to each moderator
+/// are Unique (one request per mod) or Same (the same request to each)
 enum ModeratorRequest<'a, T> {
     Same(&'a T),
-    Unique(&'a [T; N_MODERATORS]),
+    Unique(&'a [T]),
 }
 
-type ModeratorResponses<Res> = [Res; N_MODERATORS];
+/// A wrapper type around a vector storing moderator responses.
+type ModeratorResponses<Res> = Vec<Res>;
 
 impl Coordinator {
     /// Sets up the coordinator and moderators
     ///
     /// Returns a new coordinator object if successful.
-    pub async fn init(batch_size: usize) -> Result<Self> {
+    pub async fn init(
+        n_moderators: usize,
+        signing_threshold: usize,
+        decryption_threshold: usize,
+        batch_size: usize,
+    ) -> Result<Self> {
         let client = reqwest::Client::new();
 
         let (
             frost_public_key_package,
             group_public_elgamal_key,
             nonce_commitments,
-        ) = Self::setup_moderators(&client, batch_size).await?;
+        ) = Self::setup_moderators(
+            &client,
+            batch_size,
+            n_moderators,
+            signing_threshold,
+            decryption_threshold,
+        )
+        .await?;
 
         Ok(Coordinator {
             client,
             frost_public_key_package,
             group_public_elgamal_key,
             nonce_commitments,
+            n_moderators,
+            signing_threshold,
+            decryption_threshold,
             batch_size,
         })
     }
@@ -60,6 +80,9 @@ impl Coordinator {
     async fn setup_moderators(
         client: &reqwest::Client,
         batch_size: usize,
+        n_moderators: usize,
+        signing_threshold: usize,
+        decryption_threshold: usize,
     ) -> Result<(
         frost::keys::PublicKeyPackage,
         elgamal::PublicKey,
@@ -69,33 +92,39 @@ impl Coordinator {
 
         let (frost_secret_shares, frost_public_key) =
             frost::keys::keygen_with_dealer(
-                N_MODERATORS as u16,
-                SIGNING_THRESHOLD as u16,
+                n_moderators as u16,
+                signing_threshold as u16,
                 &mut rng,
             )?;
 
         let (elgamal_public_key, elgamal_key_shares) =
-            elgamal::generate_private_key_shares(&mut rng);
+            elgamal::generate_private_key_shares(
+                &mut rng,
+                n_moderators,
+                decryption_threshold,
+            );
 
-        let request_bodies = array_init(|i| communication::setup::Request {
-            frost_secret_share: frost_secret_shares[i].clone(),
-            elgamal_secret_share: elgamal_key_shares[i].clone(),
-            batch_size,
-        });
+        let mut request_bodies = Vec::with_capacity(n_moderators);
+        request_bodies.extend((0..n_moderators).map(|i| {
+            communication::setup::Request {
+                frost_secret_share: frost_secret_shares[i].clone(),
+                elgamal_secret_share: elgamal_key_shares[i].clone(),
+                batch_size,
+            }
+        }));
 
         let responses = query_moderators::<_, communication::setup::Response>(
             client,
             "setup",
             ModeratorRequest::Unique(&request_bodies),
+            n_moderators,
         )
         .await?;
 
         let nonce_commitments = responses
             .into_iter()
             .map(|response| response.nonce_commitments)
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap_or_else(|_| panic!());
+            .collect();
 
         Ok((frost_public_key, elgamal_public_key, nonce_commitments))
     }
@@ -118,6 +147,7 @@ impl Coordinator {
                 &self.client,
                 "signing",
                 ModeratorRequest::Same(&request),
+                self.n_moderators,
             )
             .await?;
 
@@ -146,9 +176,7 @@ impl Coordinator {
         self.nonce_commitments = moderator_responses
             .into_iter()
             .map(|response| response.new_nonce_commitments)
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap_or_else(|_| panic!());
+            .collect();
 
         Ok(signed_tokens)
     }
@@ -167,6 +195,7 @@ impl Coordinator {
                 &self.client,
                 "decryption",
                 ModeratorRequest::Same(&request),
+                self.n_moderators,
             )
             .await?;
 
@@ -175,10 +204,9 @@ impl Coordinator {
             .map(|response| response.decryption_share)
             .collect();
 
-        token
-            .token
-            .x_1
-            .decrypt_with_shares(&decryption_shares[..DECRYPTION_THRESHOLD])
+        token.token.x_1.decrypt_with_shares(
+            &decryption_shares[..self.decryption_threshold],
+        )
     }
 
     fn create_signing_requests(
@@ -205,7 +233,7 @@ impl Coordinator {
                 let token_bytes = bincode::serialize(&token).unwrap();
 
                 // collect the signing_commitments
-                let signing_commitments = (0..N_MODERATORS)
+                let signing_commitments = (0..self.n_moderators)
                     .map(|moderator_index| {
                         self.nonce_commitments[moderator_index][i]
                     })
@@ -229,7 +257,7 @@ impl Coordinator {
     }
 
     pub async fn shutdown_moderators(&self) -> Result<()> {
-        future::try_join_all((1..=N_MODERATORS).map(|i| async move {
+        future::try_join_all((1..=self.n_moderators).map(|i| async move {
             let url = format!("http://cerberus-moderator-{i}:80/shutdown");
             let response = self.client.get(&url).send().await?;
 
@@ -252,15 +280,15 @@ async fn query_moderators<Req, Res>(
     client: &reqwest::Client,
     endpoint: &str,
     payload: ModeratorRequest<'_, Req>,
+    n_moderators: usize,
 ) -> Result<ModeratorResponses<Res>>
 where
     Req: Serialize + DeserializeOwned,
     Res: Serialize + DeserializeOwned,
 {
-    // TODO refactor inner closure into its own function
     let payload = &payload;
-    array_init::from_iter(
-        future::try_join_all((1..=N_MODERATORS).map(|i| async move {
+    let responses =
+        future::try_join_all((1..=n_moderators).map(|i| async move {
             let url = format!("http://cerberus-moderator-{i}:80/{endpoint}");
             let body = {
                 let body_struct = match payload {
@@ -288,7 +316,7 @@ where
                 body
             })
         }))
-        .await?,
-    )
-    .ok_or_else(|| "Failed to convert response vector into array".into())
+        .await?;
+
+    Ok(responses)
 }

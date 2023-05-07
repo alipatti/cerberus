@@ -14,8 +14,8 @@ RUN cargo build --release
 
 # -- build app --
 COPY src ./src
-COPY .env ./
-RUN cargo build --release
+COPY examples ./examples
+RUN cargo build --release --examples
 
 ###########################################
 ## SLIMMER CONTAINERS TO ACTUALLY DEPLOY ##
@@ -27,17 +27,17 @@ FROM debian:buster-slim AS moderator
 RUN apt-get update && apt-get install -y libssl-dev
 
 # COPY --from=builder usr/src/cerberus/target/debug/moderator .
-COPY --from=builder usr/src/cerberus/target/release/moderator .
-CMD ["./moderator"]
+COPY --from=builder usr/src/cerberus/target/release/examples/moderator_server .
+CMD ["./moderator_server"]
 
-FROM debian:buster-slim AS coordinator
+FROM debian:buster-slim AS tester
 
 # instal; openssl
 RUN apt-get update && apt-get install -y libssl-dev
 
 # COPY --from=builder usr/src/cerberus/target/debug/coordinator .
-COPY --from=builder usr/src/cerberus/target/release/coordinator .
-CMD ["./coordinator"]
+COPY --from=builder usr/src/cerberus/target/release/examples/dry_run .
+CMD ["./dry_run"]
 
 ########################
 ## BENCHING CONTAINER ##

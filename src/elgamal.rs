@@ -1,9 +1,9 @@
 use crate::{
-    parameters::{DECRYPTION_THRESHOLD, N_MODERATORS},
-    Result, UserId,
+    // parameters::{DECRYPTION_THRESHOLD, N_MODERATORS},
+    Result,
+    UserId,
 };
 
-use array_init::array_init;
 use curve25519_dalek::{
     constants::RISTRETTO_BASEPOINT_TABLE, ristretto::RistrettoPoint,
     scalar::Scalar,
@@ -54,7 +54,7 @@ impl PublicKey {
             .try_into()
             .expect("Unable to hash Ristretto point during ID encryption.");
 
-        let c_2 = xor_bytes(&hashed_point, &user_id.0);
+        let c_2 = xor_bytes(hashed_point, &user_id.0);
 
         EncryptedUserId { c_1, c_2 }
     }
@@ -78,14 +78,11 @@ impl KeyShare {
 }
 
 impl EncryptedUserId {
+    /// The length of `shares` MUST be exactly the decryption threshold and every share MUST be unique.
     pub fn decrypt_with_shares(
         &self,
         shares: &[DecryptionShare],
     ) -> Result<UserId> {
-        if shares.len() != DECRYPTION_THRESHOLD {
-            return Err("Wrong number of shares".into()); // wrong number of shares
-        }
-
         // TODO: extract this into a separate function
         let identifiers: Vec<_> = shares.iter().map(|share| share.0).collect();
 
@@ -100,8 +97,7 @@ impl EncryptedUserId {
             .try_into()
             .expect("Failed to compute hash during ID decryption");
 
-        let decrypted_id =
-            UserId(xor_bytes(&decryption_share_bytes, &self.c_2));
+        let decrypted_id = UserId(xor_bytes(decryption_share_bytes, &self.c_2));
 
         Ok(decrypted_id)
     }
@@ -111,14 +107,16 @@ impl EncryptedUserId {
 /// trusted central party.
 pub(crate) fn generate_private_key_shares<R: RngCore + CryptoRng>(
     rng: &mut R,
-) -> (PublicKey, [KeyShare; N_MODERATORS]) {
+    n_shares: usize,
+    decryption_threshold: usize,
+) -> (PublicKey, Vec<KeyShare>) {
     // secret to be split up
     let sk = Scalar::random(rng);
 
     // generate random polynomial coefficients
     // to be used in Shamir secret sharing
     let mut polynomial_coefficients = vec![sk];
-    for _ in 1..DECRYPTION_THRESHOLD {
+    for _ in 1..decryption_threshold {
         polynomial_coefficients.push(Scalar::random(rng))
     }
 
@@ -139,26 +137,31 @@ pub(crate) fn generate_private_key_shares<R: RngCore + CryptoRng>(
     let pk = PublicKey(&sk * &RISTRETTO_BASEPOINT_TABLE);
 
     // generate shares `(x, f(x))` for `x = 1..N_MODERATORS`
-    let sk_shares = array_init(|i| KeyShare {
-        identifier: Scalar::from(1 + i as u64),
-        sk: f(1 + i as u64),
-        pk,
-    });
+    let sk_shares = (1..=n_shares)
+        .map(|i| KeyShare {
+            identifier: Scalar::from(i as u64),
+            sk: f(i as u64),
+            pk,
+        })
+        .collect();
 
     (pk, sk_shares)
 }
 
-fn xor_bytes(a: &[u8; 32], b: &[u8; 32]) -> [u8; 32] {
-    array_init(|i| a[i] ^ b[i])
+fn xor_bytes(mut a: [u8; 32], b: &[u8; 32]) -> [u8; 32] {
+    for i in 0..32 {
+        a[i] ^= b[i]
+    }
+
+    a
 }
 
 /// Calculate the lagrange coefficients for decryption shares.
+/// The length of `other_identifiers` MUST be equal to the decryption threshold.
 pub(crate) fn lagrange_coefficient(
     identifier: &Scalar,
     other_identifiers: &[Scalar],
 ) -> Scalar {
-    assert!(other_identifiers.len() == DECRYPTION_THRESHOLD);
-
     other_identifiers
         .iter()
         .filter(|other| *other != identifier) // take the product over all i != j
@@ -171,21 +174,28 @@ mod tests {
     use curve25519_dalek::scalar::Scalar;
     use rand::Rng;
 
-    use crate::{parameters::DECRYPTION_THRESHOLD, UserId};
+    use crate::UserId;
 
     use super::generate_private_key_shares;
 
     #[test]
     fn test_decryption() {
+        let n_shares = 7;
+        let decryption_threshold = 4;
+
         let mut rng = rand::thread_rng();
 
-        let (pk, shares) = generate_private_key_shares(&mut rng);
+        let (pk, shares) = generate_private_key_shares(
+            &mut rng,
+            n_shares,
+            decryption_threshold,
+        );
 
         let id = UserId(rng.gen());
 
         let x_1 = pk.encrypt(&id, &Scalar::random(&mut rng));
 
-        let decryption_shares: Vec<_> = shares[..DECRYPTION_THRESHOLD]
+        let decryption_shares: Vec<_> = shares[..decryption_threshold]
             .iter()
             .map(|share| share.decryption_share(&x_1))
             .collect();

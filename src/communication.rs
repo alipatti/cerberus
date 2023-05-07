@@ -79,10 +79,7 @@ mod tests {
         setup,
         signing::{self, SigningRequest},
     };
-    use crate::{
-        elgamal::generate_private_key_shares, parameters::N_MODERATORS, Result,
-        UserId,
-    };
+    use crate::{elgamal::generate_private_key_shares, Result, UserId};
     use curve25519_dalek::scalar::Scalar;
     use frost::{Identifier, SigningPackage};
     use frost_core::frost::keys::SigningShare;
@@ -93,14 +90,26 @@ mod tests {
     fn test_setup_serialization() -> Result<()> {
         let mut rng = rand::thread_rng();
 
+        let n_mods = 7;
+        let signing_threshold = 6;
+        let decryption_threshold = 4;
+
         let frost_secret_share = {
-            let (shares, _) = frost::keys::keygen_with_dealer(5, 3, &mut rng)?;
+            let (shares, _) = frost::keys::keygen_with_dealer(
+                n_mods,
+                signing_threshold,
+                &mut rng,
+            )?;
 
             shares[0].to_owned()
         };
 
         let elgamal_secret_share = {
-            let (_, shares) = generate_private_key_shares(&mut rng);
+            let (_, shares) = generate_private_key_shares(
+                &mut rng,
+                n_mods as usize,
+                decryption_threshold,
+            );
             shares[0].to_owned()
         };
 
@@ -134,9 +143,13 @@ mod tests {
         // make dummy data
         let mut rng = rand::thread_rng();
 
-        let mut signing_requests = Vec::with_capacity(N_MODERATORS);
-        for _ in 0..N_MODERATORS {
-            let signing_commitments = (0..N_MODERATORS)
+        let n_mods = 7;
+        let signing_threshold = 6;
+        let decryption_threshold = 4;
+
+        let mut signing_requests = Vec::with_capacity(n_mods);
+        for _ in 0..n_mods {
+            let signing_commitments = (0..n_mods)
                 .map(|i| {
                     let participant_identifier =
                         Identifier::try_from((i + 1) as u16).unwrap();

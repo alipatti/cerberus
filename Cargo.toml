@@ -13,10 +13,6 @@ futures = "0.3.25"
 serde = { version = "1.0.148", features = ["derive"] }
 bincode = "1.3.3"
 
-# parameters
-konst = "0.3.4"
-load-dotenv = "0.1.2"
-
 # http
 reqwest = "0.11.13"
 tiny_http = "0.12.0"
@@ -28,8 +24,6 @@ rand = "0.8.5"
 # TODO: submit PR to FROST with serialization improvements
 frost-core = { git = "http://github.com/alipatti/frost", branch = "add-serde" }
 frost-ristretto255 = { git = "http://github.com/alipatti/frost", branch = "add-serde" }
-
-array-init = "2.1.0"
 
 # benchmarking
 criterion = { version = "0.4.0", features = ["async", "tokio", "async_tokio"] }

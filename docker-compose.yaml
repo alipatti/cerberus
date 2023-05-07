@@ -1,35 +1,34 @@
 services:
-  # coordinator:
-  #   env_file: .env
-  #   build:
-  #     context: .
-  #     target: coordinator
-  #   deploy:
-  #     resources:
-  #       reservations:
-  #         cpus: "1"
-  #         memory: "1g"
-
-  bencher:
-    env_file: .env
-
+  tester:
     build:
       context: .
-      target: bencher
-
+      target: tester
     deploy:
       resources:
         reservations:
           cpus: "1"
           memory: "1g"
-        limits:
-          cpus: "1"
-          memory: "1g"
+
+  # bencher:
+  #   env_file: .env
+
+  #   build:
+  #     context: .
+  #     target: bencher
+
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         cpus: "1"
+  #         memory: "1g"
+  #       limits:
+  #         cpus: "1"
+  #         memory: "1g"
 
   moderator:
     deploy:
       mode: replicated
-      replicas: ${CERBERUS_N_MODERATORS}
+      replicas: 5
       resources:
         reservations:
           cpus: "1"
