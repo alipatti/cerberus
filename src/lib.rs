@@ -8,6 +8,7 @@ mod elgamal;
 mod roles;
 mod token;
 
+pub use parameters::{DECRYPTION_THRESHOLD, N_MODERATORS, SIGNING_THRESHOLD};
 pub use roles::{coordinator::Coordinator, moderator::Moderator};
 
 /// Protocol hyperparameters
@@ -30,9 +31,9 @@ mod parameters {
     pub const DECRYPTION_THRESHOLD: usize =
         unwrap_ctx!(parse_usize(env!("CERBERUS_ENCRYPTION_THRESHOLD")));
 
-    /// Size of the token batches created during construction.
-    pub const BATCH_SIZE: usize =
-        unwrap_ctx!(parse_usize(env!("CERBERUS_BATCH_SIZE")));
+    // Size of the token batches created during construction.
+    // pub const BATCH_SIZE: usize =
+    //     unwrap_ctx!(parse_usize(env!("CERBERUS_BATCH_SIZE")));
 }
 
 /// Wrapper type for an
@@ -48,11 +49,8 @@ impl UserId {
 // TODO
 pub type UserPublicKey = [u8; 32];
 
-/// Wrapper type for a constant-length array representing a single batch
-/// of something in the protocol, e.g., a batch of signature shares
-/// sent by a moderator to the coordinator.
-// TODO change this to heap-allocated memory.
-// we get stack overflow with too large of batch sizes
-type Batch<T> = [T; parameters::BATCH_SIZE];
+/// Wrapper a single batch of something in the protocol, e.g.,
+/// a batch of signature shares sent by a moderator to the coordinator.
+type Batch<T> = Vec<T>;
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;

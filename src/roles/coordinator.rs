@@ -8,8 +8,7 @@ use futures::future;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-    communication::{self as coms, signing::SigningRequest},
-    elgamal,
+    communication, elgamal,
     parameters::{DECRYPTION_THRESHOLD, N_MODERATORS, SIGNING_THRESHOLD},
     token::{SignedToken, UnsignedToken},
     Batch, Result, UserId,
@@ -25,6 +24,8 @@ pub struct Coordinator {
     client: reqwest::Client,
 
     nonce_commitments: CommitmentBatch,
+
+    batch_size: usize,
 }
 
 enum ModeratorRequest<'a, T> {
@@ -38,25 +39,27 @@ impl Coordinator {
     /// Sets up the coordinator and moderators
     ///
     /// Returns a new coordinator object if successful.
-    pub async fn init() -> Result<Self> {
+    pub async fn init(batch_size: usize) -> Result<Self> {
         let client = reqwest::Client::new();
 
         let (
             frost_public_key_package,
             group_public_elgamal_key,
             nonce_commitments,
-        ) = Self::setup_moderators(&client).await?;
+        ) = Self::setup_moderators(&client, batch_size).await?;
 
         Ok(Coordinator {
             client,
             frost_public_key_package,
             group_public_elgamal_key,
             nonce_commitments,
+            batch_size,
         })
     }
 
     async fn setup_moderators(
         client: &reqwest::Client,
+        batch_size: usize,
     ) -> Result<(
         frost::keys::PublicKeyPackage,
         elgamal::PublicKey,
@@ -74,24 +77,29 @@ impl Coordinator {
         let (elgamal_public_key, elgamal_key_shares) =
             elgamal::generate_private_key_shares(&mut rng);
 
-        let request_bodies = array_init(|i| coms::setup::Request {
+        let request_bodies = array_init(|i| communication::setup::Request {
             frost_secret_share: frost_secret_shares[i].clone(),
             elgamal_secret_share: elgamal_key_shares[i].clone(),
+            batch_size,
         });
 
-        let responses = query_moderators::<_, coms::setup::Response>(
+        let responses = query_moderators::<_, communication::setup::Response>(
             client,
             "setup",
             ModeratorRequest::Unique(&request_bodies),
         )
         .await?;
 
-        let nonce_commitments = array_init::from_iter(
-            responses.iter().map(|response| response.nonce_commitments),
-        )
-        .expect("Not enough nonce commitments.");
+        let nonce_commitments: Vec<_> = responses
+            .into_iter()
+            .map(|response| response.nonce_commitments)
+            .collect();
 
-        Ok((frost_public_key, elgamal_public_key, nonce_commitments))
+        Ok((
+            frost_public_key,
+            elgamal_public_key,
+            nonce_commitments.try_into().unwrap_or_else(|_| panic!()),
+        ))
     }
 
     pub async fn create_tokens(
@@ -102,20 +110,24 @@ impl Coordinator {
         let signing_requests = self.create_signing_requests(user_ids);
         let signing_requests_backup = signing_requests.clone();
 
-        let request = coms::signing::Request { signing_requests };
+        let request = communication::signing::Request { signing_requests };
 
         // get signature shares from each moderator for all tokens in the batch
+        println!("Sending signing requests...");
         let moderator_responses =
-            query_moderators::<_, coms::signing::Response>(
+            query_moderators::<_, communication::signing::Response>(
                 &self.client,
                 "signing",
                 ModeratorRequest::Same(&request),
             )
             .await?;
+        println!("Recieved responses.");
 
         // package the results as a SignedToken batch
-        let signed_tokens: Batch<SignedToken> =
-            array_init::try_array_init(|i| -> Result<SignedToken> {
+        let signed_tokens = {
+            let mut token_vec = Vec::with_capacity(self.batch_size);
+
+            for i in 0..self.batch_size {
                 let signature_shares: Vec<_> = moderator_responses
                     .iter()
                     .map(|response| response.signature_shares[i])
@@ -131,8 +143,11 @@ impl Coordinator {
                     &self.frost_public_key_package,
                 )?;
 
-                Ok(SignedToken { signature, token })
-            })?;
+                token_vec.push(SignedToken { signature, token });
+            }
+
+            token_vec
+        };
 
         Ok(signed_tokens)
     }
@@ -141,17 +156,18 @@ impl Coordinator {
         &self,
         token: &SignedToken,
     ) -> Result<UserId> {
-        let request = coms::decryption::Request {
+        let request = communication::decryption::Request {
             message: "hello world".as_bytes().to_owned(),
             x_1: token.token.x_1.clone(),
         };
 
-        let responses = query_moderators::<_, coms::decryption::Response>(
-            &self.client,
-            "decryption",
-            ModeratorRequest::Same(&request),
-        )
-        .await?;
+        let responses =
+            query_moderators::<_, communication::decryption::Response>(
+                &self.client,
+                "decryption",
+                ModeratorRequest::Same(&request),
+            )
+            .await?;
 
         let decryption_shares: Vec<_> = responses
             .into_iter()
@@ -167,10 +183,11 @@ impl Coordinator {
     fn create_signing_requests(
         &self,
         user_ids: &Batch<UserId>,
-    ) -> Batch<SigningRequest> {
+    ) -> Batch<communication::signing::SigningRequest> {
         let mut rng = rand::thread_rng();
 
-        array_init(|i| {
+        let mut requests = Vec::with_capacity(self.batch_size);
+        for i in 0..self.batch_size {
             let elgamal_randomness = Scalar::random(&mut rng);
             let user_id = user_ids[i];
 
@@ -201,12 +218,14 @@ impl Coordinator {
                 )
             };
 
-            SigningRequest {
+            requests.push(communication::signing::SigningRequest {
                 signing_package,
                 elgamal_randomness,
                 user_id,
-            }
-        })
+            })
+        }
+
+        requests
     }
 }
 

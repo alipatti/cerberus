@@ -129,7 +129,10 @@ pub(crate) fn generate_private_key_shares<R: RngCore + CryptoRng>(
         polynomial_coefficients
             .iter()
             .zip(0..)
-            .map(move |(a, k)| a * Scalar::from(x.pow(k)))
+            .map(move |(a, k)|             a * Scalar::from(
+                x.checked_pow(k)
+                .expect("Exponentiation overflow during computation of Shamir polynomial."))
+            )
             .sum()
     };
 

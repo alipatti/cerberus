@@ -1,11 +1,6 @@
-use core::panic;
 use std::error::Error;
 
-use crate::{
-    communication, communication::signing::SigningRequest, elgamal,
-    parameters::BATCH_SIZE, token::UnsignedToken, Batch, Result,
-};
-use array_init::try_array_init;
+use crate::{communication, elgamal, token::UnsignedToken, Batch, Result};
 use frost::{
     round1::{SigningCommitments, SigningNonces},
     round2::SignatureShare,
@@ -16,6 +11,9 @@ pub struct Moderator {
     // key material
     sk_signing: frost::keys::KeyPackage,
     encryption_keys: elgamal::KeyShare,
+
+    /// The size of the token-creation batches requested from the user/coordinator.
+    batch_size: usize,
 
     /// The next batch of nonces to use
     ///
@@ -66,8 +64,11 @@ impl Moderator {
             frost::keys::KeyPackage::try_from(body.frost_secret_share)?;
 
         // create `Moderator` object and the first batch of FROST nonce commitments
-        let (moderator, nonce_commitments) =
-            Moderator::new(frost_key_package, body.elgamal_secret_share);
+        let (moderator, nonce_commitments) = Moderator::new(
+            frost_key_package,
+            body.elgamal_secret_share,
+            body.batch_size,
+        );
 
         // send response back to coordinator
         request.respond({
@@ -109,14 +110,17 @@ impl Moderator {
     fn new(
         signing_keys: frost::keys::KeyPackage,
         encryption_keys: elgamal::KeyShare,
+        batch_size: usize,
     ) -> (Self, Batch<SigningCommitments>) {
-        let (nonces, commitments) = Moderator::generate_nonces(&signing_keys);
+        let (nonces, commitments) =
+            Moderator::generate_nonces(&signing_keys, batch_size);
 
         (
             Self {
                 sk_signing: signing_keys,
                 nonces,
                 encryption_keys,
+                batch_size,
             },
             commitments,
         )
@@ -125,16 +129,20 @@ impl Moderator {
     /// Signs a new batch of tokens. This method also internally updates the stored nonces and returns a new batch of commitments.
     fn sign_batch(
         &mut self,
-        signing_requests: &Batch<SigningRequest>,
+        signing_requests: &Batch<communication::signing::SigningRequest>,
     ) -> Result<(Batch<SignatureShare>, Batch<SigningCommitments>)> {
         //  create signatures
-        let signatures = try_array_init(|i| {
-            self.process_signing_request(&signing_requests[i], &self.nonces[i])
-        })?;
+        let mut signatures = Vec::with_capacity(self.batch_size);
+        for i in 0..self.batch_size {
+            signatures.push(self.process_signing_request(
+                &signing_requests[i],
+                &self.nonces[i],
+            )?)
+        }
 
         // create new nonces
         let (new_nonces, new_commitments) =
-            Moderator::generate_nonces(&self.sk_signing);
+            Moderator::generate_nonces(&self.sk_signing, self.batch_size);
 
         // store the secrets, and return the new commitments alongside the signatures
         self.nonces = new_nonces;
@@ -143,7 +151,7 @@ impl Moderator {
 
     fn process_signing_request(
         &self,
-        signing_request: &SigningRequest,
+        signing_request: &communication::signing::SigningRequest,
         nonces: &SigningNonces,
     ) -> Result<SignatureShare> {
         self.verify_signing_request(signing_request)?;
@@ -152,7 +160,7 @@ impl Moderator {
 
     fn sign_signing_request(
         &self,
-        signing_request: &SigningRequest,
+        signing_request: &communication::signing::SigningRequest,
         nonces: &SigningNonces,
     ) -> Result<SignatureShare> {
         frost::round2::sign(
@@ -166,7 +174,7 @@ impl Moderator {
 
     fn verify_signing_request(
         &self,
-        signing_request: &SigningRequest,
+        signing_request: &communication::signing::SigningRequest,
     ) -> Result<()> {
         // check that the thing being signed really is an encryption of
         // the claimed UserId with the claimed randomness
@@ -200,15 +208,16 @@ impl Moderator {
     // not a &self method because it's called by init
     fn generate_nonces(
         frost_keys: &frost::keys::KeyPackage,
+        batch_size: usize,
     ) -> (Batch<SigningNonces>, Batch<SigningCommitments>) {
         let mut rng = rand::thread_rng();
 
         // allocate vectors
-        let mut nonces = Vec::with_capacity(BATCH_SIZE);
-        let mut commitments = Vec::with_capacity(BATCH_SIZE);
+        let mut nonces = Vec::with_capacity(batch_size);
+        let mut commitments = Vec::with_capacity(batch_size);
 
         // fill vectors
-        for _ in 0..BATCH_SIZE {
+        for _ in 0..batch_size {
             let (nonce, commitment) = frost::round1::commit(
                 frost_keys.identifier,
                 &frost_keys.secret_share,
@@ -218,12 +227,7 @@ impl Moderator {
             commitments.push(commitment);
         }
 
-        // cast vectors into array
-        // requires a hacky unwrap because the FROST structs aren't Debug
-        (
-            nonces.try_into().unwrap_or_else(|_| panic!()),
-            commitments.try_into().unwrap_or_else(|_| panic!()),
-        )
+        (nonces, commitments)
     }
 
     fn handle_decryption(&self, mut request: tiny_http::Request) -> Result<()> {
