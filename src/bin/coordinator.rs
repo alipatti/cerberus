@@ -12,20 +12,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // setup moderators
     println!("Initializing moderators...");
-    let coordinator = Coordinator::init(batch_size).await?;
+    let mut coordinator = Coordinator::init(batch_size).await?; // needs to be mutable to update nonce commitments
     println!("Successfully setup moderators!.");
 
     // request tokens
     println!("Requesting a batch of tokens...");
     let mut rng = rand::thread_rng();
-    let user_ids = (0..batch_size)
-        .map(|_| UserId::random(&mut rng))
-        .collect::<Vec<_>>()
-        .try_into()
-        .unwrap();
+    let user_ids = (0..batch_size).map(|_| UserId::random(&mut rng)).collect();
 
+    coordinator.create_tokens(&user_ids).await?;
+    println!("Successfully signed token batch 1!");
+
+    // sign another batch to make sure that nonces are being properly kept in sync
     let tokens = coordinator.create_tokens(&user_ids).await?;
-    println!("Successfully signed tokens!");
+    println!("Successfully signed token batch 2!");
 
     // request decryption shares
     println!("Requesting decryption shares...");

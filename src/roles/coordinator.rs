@@ -90,30 +90,29 @@ impl Coordinator {
         )
         .await?;
 
-        let nonce_commitments: Vec<_> = responses
+        let nonce_commitments = responses
             .into_iter()
             .map(|response| response.nonce_commitments)
-            .collect();
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap_or_else(|_| panic!());
 
-        Ok((
-            frost_public_key,
-            elgamal_public_key,
-            nonce_commitments.try_into().unwrap_or_else(|_| panic!()),
-        ))
+        Ok((frost_public_key, elgamal_public_key, nonce_commitments))
     }
 
     pub async fn create_tokens(
-        &self,
+        &mut self,
         user_ids: &Batch<UserId>,
     ) -> Result<Batch<SignedToken>> {
         // create signing requests to sent to the moderators
         let signing_requests = self.create_signing_requests(user_ids);
-        let signing_requests_backup = signing_requests.clone();
 
-        let request = communication::signing::Request { signing_requests };
+        let request = communication::signing::Request {
+            // FIX: this clone doesn't seem like it should be necessary...
+            signing_requests: signing_requests.clone(),
+        };
 
         // get signature shares from each moderator for all tokens in the batch
-        println!("Sending signing requests...");
         let moderator_responses =
             query_moderators::<_, communication::signing::Response>(
                 &self.client,
@@ -121,33 +120,34 @@ impl Coordinator {
                 ModeratorRequest::Same(&request),
             )
             .await?;
-        println!("Recieved responses.");
 
         // package the results as a SignedToken batch
-        let signed_tokens = {
-            let mut token_vec = Vec::with_capacity(self.batch_size);
+        let mut signed_tokens = Vec::with_capacity(self.batch_size);
 
-            for i in 0..self.batch_size {
-                let signature_shares: Vec<_> = moderator_responses
-                    .iter()
-                    .map(|response| response.signature_shares[i])
-                    .collect();
+        for i in 0..self.batch_size {
+            let signature_shares: Vec<_> = moderator_responses
+                .iter()
+                .map(|response| response.signature_shares[i])
+                .collect();
 
-                let signing_package =
-                    &signing_requests_backup[i].signing_package;
-                let token = bincode::deserialize(signing_package.message())?;
+            let signing_package = &signing_requests[i].signing_package;
+            let token = bincode::deserialize(signing_package.message())?;
 
-                let signature = frost::aggregate(
-                    signing_package,
-                    &signature_shares,
-                    &self.frost_public_key_package,
-                )?;
+            let signature = frost::aggregate(
+                signing_package,
+                &signature_shares,
+                &self.frost_public_key_package,
+            )?;
 
-                token_vec.push(SignedToken { signature, token });
-            }
+            signed_tokens.push(SignedToken { signature, token });
+        }
 
-            token_vec
-        };
+        self.nonce_commitments = moderator_responses
+            .into_iter()
+            .map(|response| response.new_nonce_commitments)
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap_or_else(|_| panic!());
 
         Ok(signed_tokens)
     }

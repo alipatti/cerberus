@@ -1,15 +1,43 @@
 services:
-  coordinator:
+  # coordinator:
+  #   env_file: .env
+  #   build:
+  #     context: .
+  #     target: coordinator
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         cpus: "1"
+  #         memory: "1g"
+
+  bencher:
     env_file: .env
+
     build:
       context: .
-      target: coordinator
+      target: bencher
+
+    deploy:
+      resources:
+        reservations:
+          cpus: "1"
+          memory: "1g"
+        limits:
+          cpus: "1"
+          memory: "1g"
 
   moderator:
-    # this is depricated, but it still works despite the
-    # linter error. see: https://linuxhint.com/docker_compose_scale/
-    # TODO: migrate to new version of compose spec
-    scale: ${CERBERUS_N_MODERATORS}
+    deploy:
+      mode: replicated
+      replicas: ${CERBERUS_N_MODERATORS}
+      resources:
+        reservations:
+          cpus: "1"
+          memory: "1g"
+        limits:
+          cpus: "1"
+          memory: "1g"
+
     build:
       context: .
       target: moderator

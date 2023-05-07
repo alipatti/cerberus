@@ -30,14 +30,14 @@ pub mod signing {
 
     #[derive(Deserialize, Serialize, Clone)]
     pub struct Request {
-        pub signing_requests: Batch<SigningRequest>,
+        pub(crate) signing_requests: Batch<SigningRequest>,
     }
 
     #[derive(Deserialize, Serialize)]
     pub struct Response {
-        pub signature_shares: Batch<SignatureShare>,
+        pub(crate) signature_shares: Batch<SignatureShare>,
 
-        pub new_nonce_commitments: Batch<SigningCommitments>,
+        pub(crate) new_nonce_commitments: Batch<SigningCommitments>,
     }
 
     #[derive(Deserialize, Serialize, Clone)]
