@@ -44,7 +44,7 @@ FROM builder AS bencher
 # HACK: add benchmark to cargo manifest
 RUN echo "\
 [[bench]]\n\
-name = 'benchmarks'\n\
+name = 'token_creation'\n\
 harness = false \n\
 " >>Cargo.toml
 
