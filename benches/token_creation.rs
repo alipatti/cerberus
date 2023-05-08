@@ -7,7 +7,7 @@ fn bench_token_creation(c: &mut Criterion) {
     // SETUP //
     ///////////
 
-    let batch_sizes = vec![10, 50];
+    let batch_sizes = vec![1, 10, 50, 100, 200, 500, 750, 1000];
     let n_moderators = 5;
     let signing_threshold = 4;
     let decryption_threshold = 3;

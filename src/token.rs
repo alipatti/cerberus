@@ -27,3 +27,5 @@ pub struct UnsignedToken {
     pub(crate) x_1: EncryptedUserId,
     pub(crate) pk_e: UserPublicKey,
 }
+
+// (x1, t1, σ1,(pke, ske))

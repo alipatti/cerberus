@@ -1,5 +1,3 @@
-// #[warn(clippy::pedantic)]
-
 use rand::{CryptoRng, Rng, RngCore};
 use serde::{Deserialize, Serialize};
 
@@ -20,11 +18,12 @@ impl UserId {
     }
 }
 
-// TODO
 pub type UserPublicKey = [u8; 32];
 
 /// Wrapper a single batch of something in the protocol, e.g.,
 /// a batch of signature shares sent by a moderator to the coordinator.
 type Batch<T> = Vec<T>;
 
+/// Convenience type to avoid typing this out
+/// for every function signature
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;

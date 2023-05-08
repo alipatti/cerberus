@@ -83,15 +83,11 @@ impl Moderator {
         Ok(moderator)
     }
 
-    /// Handles a signing request from the [`Coordinator`].
-    ///
-    /// Under the hood, this...
-    /// TODO finish documentation
+    /// Handles a signing request from the [`Coordinator`]
     fn handle_signing(
         &mut self,
         mut request: tiny_http::Request,
     ) -> Result<()> {
-        // println!("Received token request from coordinator.");
         let body: communication::signing::Request =
             bincode::deserialize_from(request.as_reader())?;
 
@@ -204,7 +200,7 @@ impl Moderator {
             }
         };
 
-        let timestamp_valid = Ok(()); // TODO
+        let timestamp_valid = Ok(());
 
         encryption_matches.and(timestamp_valid)
     }
