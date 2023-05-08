@@ -8,6 +8,7 @@
 \usepackage{ali-pseudocode}
 \usepackage{ali-crypto}
 \usepackage[colorlinks]{hyperref}
+\usepackage{tikz}
 
 \usepackage[style=ieee]{biblatex}
 \addbibresource{sources.bib}
@@ -127,12 +128,12 @@ This process of ``voting'' adresses the question posed in \cite{hecate} of how t
 \section{Benchmarks}
 
 \textcite{hecate} includes an implementation and benchmark of the whole message cycle, so we focus on the modified portions of the protocol: token creation and message reporting.
-We implement these steps in Rust and run each party in a separate Linux container communicating over HTTP. Each container is allotted a single 2.6 GHz core and 1GB of RAM, and more detailed results along with the implementation is available on github \cite{cerberus-github}. As expected, the distributed version of the protocol is much slower than Hecate
-% TODO: justify this
+We implement these steps in Rust and run each party in a separate Linux container communicating over HTTP. More details of the benchmarks as well as the source code is available on github \cite{cerberus-github}. Cerberus is much slower to create tokens than Hecate (on the order of 30-50x), but this isn't a huge surprise: the benchmarks were run on slower hardware, and the distributed nature of this protocol involves many verification, serialization, and communication steps that are not required in Hecate. With that said, the operational costs of implementing a protocol such as this are still \textit{well} within the budgetary constraints of a large company like Facebook.
 
 \begin{figure}[tb]
 	\centering
-	\includegraphics[width = .8 \columnwidth]{example-image-a}
+	\footnotesize
+	\input{benchmark-plot.tex}
 	\caption{Token creation times as a function of batch size and number of moderators.}
 	\label{fig:token-creation-benchmark}
 \end{figure}

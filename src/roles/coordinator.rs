@@ -190,8 +190,8 @@ impl Coordinator {
         token: &SignedToken,
     ) -> Result<UserId> {
         let request = communication::decryption::Request {
-            message: "hello world".as_bytes().to_owned(),
-            x_1: token.token.x_1.clone(),
+            message: "some abusive message".as_bytes().to_owned(),
+            token: token.clone(),
         };
 
         let responses =

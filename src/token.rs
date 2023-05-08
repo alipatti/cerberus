@@ -1,23 +1,19 @@
-use crate::{
-    elgamal::{self, EncryptedUserId},
-    UserPublicKey,
-};
+use crate::{elgamal::EncryptedUserId, UserPublicKey};
 use frost_ristretto255 as frost;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct SignedToken {
     pub signature: frost::Signature,
     pub token: UnsignedToken,
 }
 
 impl SignedToken {
-    pub fn verify(
-        &self,
-        _public_key: elgamal::PublicKey,
-    ) -> Result<(), Box<dyn Error>> {
-        unimplemented!()
+    pub fn verify(&self) -> Result<(), Box<dyn Error>> {
+        // in practice, there would be more here
+
+        Ok(())
     }
 }
 

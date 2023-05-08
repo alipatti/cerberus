@@ -234,9 +234,10 @@ impl Moderator {
         let body: communication::decryption::Request =
             bincode::deserialize_from(request.as_reader())?;
 
-        // TODO: verify well-formed-ness of the report
+        body.token.verify()?;
 
-        let decryption_share = self.encryption_keys.decryption_share(&body.x_1);
+        let decryption_share =
+            self.encryption_keys.decryption_share(&body.token.token.x_1);
 
         request.respond({
             let body = communication::decryption::Response { decryption_share };

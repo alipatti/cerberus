@@ -41,14 +41,20 @@ CMD ["./dry_run"]
 
 FROM builder AS bencher
 
-# HACK: add benchmark to cargo manifest
+# HACK: add benchmarks to cargo manifest
 RUN echo "\
 [[bench]]\n\
 name = 'token_creation'\n\
 harness = false \n\
 " >>Cargo.toml
 
+RUN echo "\
+[[bench]]\n\
+name = 'message_reporting'\n\
+harness = false \n\
+" >>Cargo.toml
+
 # copy in benchmarks themselves
 COPY benches/ ./benches
 
-CMD ["cargo", "bench", "--bench", "token_creation"]
+CMD ["cargo", "bench", "--bench", "message_reporting"]

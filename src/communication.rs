@@ -55,14 +55,12 @@ pub mod signing {
 pub mod decryption {
     use serde::{Deserialize, Serialize};
 
-    use crate::elgamal::{DecryptionShare, EncryptedUserId};
+    use crate::{elgamal::DecryptionShare, token::SignedToken};
 
     #[derive(Deserialize, Serialize)]
     pub struct Request {
         pub message: Vec<u8>,
-        pub x_1: EncryptedUserId,
-        // TODO: add the remainder of the stuff that goes here:
-        // - signatures, commitments, etc.
+        pub token: SignedToken,
     }
 
     #[derive(Deserialize, Serialize)]
