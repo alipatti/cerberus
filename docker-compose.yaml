@@ -24,7 +24,7 @@ services:
   moderator:
     deploy:
       mode: replicated
-      replicas: 5
+      replicas: 7
       resources:
         reservations:
           cpus: "1"

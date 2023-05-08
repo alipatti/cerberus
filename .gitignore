@@ -7,9 +7,6 @@
 # IEEE latex class file
 writeup/IEEEtran.cls
 
-# benchmark results (for now)
-benches/results
-
 # -----------------------------
 # -- DEFAULT LATEX GITIGNORE -- 
 # -----------------------------

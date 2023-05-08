@@ -50,6 +50,10 @@ impl Coordinator {
         decryption_threshold: usize,
         batch_size: usize,
     ) -> Result<Self> {
+        assert!(n_moderators >= signing_threshold);
+        assert!(n_moderators >= decryption_threshold);
+        assert!(batch_size >= 1);
+
         let client = reqwest::Client::new();
 
         let (
