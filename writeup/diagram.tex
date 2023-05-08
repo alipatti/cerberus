@@ -1,70 +1,49 @@
-\section{Cerberus}
 
-\subsection{Limitations}
+\begin{tikzpicture}
+	\graph[
+	layered layout,
+	grow=right,
+	level distance=2in,
+	sibling distance=.75in,
+	edge quotes mid,
+	nodes = {
+			draw,
+			rounded corners,
+			inner sep = 4pt
+		},
+	edges = {
+			shorten > = 5pt,
+			shorten < = 5pt,
+			nodes={
+					near start,
+					font=\footnotesize,
+					fill=white,
+					sloped,
+					inner sep=2pt
+				}}
+	]{
 
-\begin{enumerate}
-	\item Coordinator can give token to anyone
-	\item Slower (see implementation)
-\end{enumerate}
+	% -- forward path --
+	{Alice["\footnotesize \underline{User}"]}
+	->[bend left=5pt, orange, "1"]
+	Corbin["\footnotesize \underline{Coordinator}"]
+	->[bend left=5pt, orange, "2"]
+	{
+	Maurice,
+	Maude["\footnotesize \underline{Moderators}"]
+	};
 
-\begin{figure}[htbp]
-	\centering
-	\begin{tikzpicture}
-		\graph[
-		layered layout,
-		grow=right,
-		level distance=2in,
-		sibling distance=.75in,
-		edge quotes mid,
-		nodes = {
-				draw,
-				rounded corners,
-				inner sep = 4pt
-			},
-		edges = {
-				shorten > = 5pt,
-				shorten < = 5pt,
-				nodes={
-						near start,
-						font=\footnotesize,
-						fill=white,
-						sloped,
-						inner sep=2pt
-					}}
-		]{
+	% -- return path --
+	{Maurice, Maude}
+	->[bend left=5pt, teal, "3"]
+	Corbin
+	->[bend left=5pt, teal, "4"]
+	Alice;
 
-		% -- forward path --
-		{Alice["\footnotesize \underline{User}"]}
-		->[bend left=5pt, orange, "1"]
-		Corbin["\footnotesize \underline{Coordinator}"]
-		->[bend left=5pt, orange, "2"]
-		{
-		Maurice,
-		Maude["\footnotesize \underline{Moderators}"]
-		};
+	};
 
-		% -- return path --
-		{Maurice, Maude}
-		->[bend left=5pt, teal, "3"]
-		Corbin
-		->[bend left=5pt, teal, "4"]
-		Alice;
+	% -- add elipsis between moderators --
+	% TODO center vertically
+	\path (Maurice) -- node {$\vdots$} (Maude);
 
-		};
-
-		% -- add elipsis between moderators --
-		% TODO center vertically
-		\path (Maurice) -- node {$\vdots$} (Maude);
-
-	\end{tikzpicture}
-
-	\caption{The general flow of the new protocol. Details are provided in \autoref{}}
-	\label{fig:data-flow}
-\end{figure}
-
-\begin{enumerate}
-	\item A user submits a request for tokens from a moderator.
-	\item creation of unsigned tokens, request for signatures
-	\item response with signatures
-	\item forward signed tokens to user
-\end{enumerate}
+\end{tikzpicture}
