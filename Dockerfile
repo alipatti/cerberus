@@ -23,19 +23,15 @@ RUN cargo build --release --examples
 
 FROM debian:buster-slim AS moderator
 
-# install openssl
 RUN apt-get update && apt-get install -y libssl-dev
 
-# COPY --from=builder usr/src/cerberus/target/debug/moderator .
 COPY --from=builder usr/src/cerberus/target/release/examples/moderator_server .
 CMD ["./moderator_server"]
 
 FROM debian:buster-slim AS tester
 
-# instal; openssl
 RUN apt-get update && apt-get install -y libssl-dev
 
-# COPY --from=builder usr/src/cerberus/target/debug/coordinator .
 COPY --from=builder usr/src/cerberus/target/release/examples/dry_run .
 CMD ["./dry_run"]
 
@@ -55,4 +51,4 @@ harness = false \n\
 # copy in benchmarks themselves
 COPY benches/ ./benches
 
-CMD ["cargo", "bench"]
+CMD ["cargo", "bench", "--bench", "token_creation"]

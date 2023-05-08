@@ -27,7 +27,7 @@ pub struct Coordinator {
     batch_size: usize,
     n_moderators: usize,
     decryption_threshold: usize,
-    signing_threshold: usize,
+    _signing_threshold: usize, // TODO: do we need this?
 }
 
 /// Enum representing whether or not the requests to each moderator
@@ -71,7 +71,7 @@ impl Coordinator {
             group_public_elgamal_key,
             nonce_commitments,
             n_moderators,
-            signing_threshold,
+            _signing_threshold: signing_threshold,
             decryption_threshold,
             batch_size,
         })
@@ -154,18 +154,18 @@ impl Coordinator {
         // package the results as a SignedToken batch
         let mut signed_tokens = Vec::with_capacity(self.batch_size);
 
-        // TODO make the linter stop complaining about this
-        for i in 0..self.batch_size {
+        for (i, signing_request) in signing_requests.into_iter().enumerate() {
             let signature_shares: Vec<_> = moderator_responses
                 .iter()
                 .map(|response| response.signature_shares[i])
                 .collect();
 
-            let signing_package = &signing_requests[i].signing_package;
-            let token = bincode::deserialize(signing_package.message())?;
+            let token = bincode::deserialize(
+                signing_request.signing_package.message(),
+            )?;
 
             let signature = frost::aggregate(
-                signing_package,
+                &signing_request.signing_package,
                 &signature_shares,
                 &self.frost_public_key_package,
             )?;

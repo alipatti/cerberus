@@ -1,29 +1,25 @@
 services:
-  tester:
+  # tester:
+  #   build:
+  #     context: .
+  #     target: tester
+
+  bencher:
     build:
       context: .
-      target: tester
+      target: bencher
+
     deploy:
       resources:
         reservations:
           cpus: "1"
           memory: "1g"
+        limits:
+          cpus: "1"
+          memory: "1g"
 
-  # bencher:
-  #   env_file: .env
-
-  #   build:
-  #     context: .
-  #     target: bencher
-
-  #   deploy:
-  #     resources:
-  #       reservations:
-  #         cpus: "1"
-  #         memory: "1g"
-  #       limits:
-  #         cpus: "1"
-  #         memory: "1g"
+    volumes:
+      - "./benches/results:/usr/src/cerberus/target/criterion"
 
   moderator:
     deploy:

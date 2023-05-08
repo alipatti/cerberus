@@ -144,8 +144,6 @@ mod tests {
         let mut rng = rand::thread_rng();
 
         let n_mods = 7;
-        let signing_threshold = 6;
-        let decryption_threshold = 4;
 
         let mut signing_requests = Vec::with_capacity(n_mods);
         for _ in 0..n_mods {
@@ -178,8 +176,6 @@ mod tests {
             })
         }
 
-        // because we allocate the vector with capacity `N_MODERATORS`,
-        // there is no copy when we convert to a sized boxed array
         let request = signing::Request { signing_requests };
 
         let should_be_request: signing::Request = {

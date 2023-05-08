@@ -4,7 +4,7 @@ use std::{error::Error, thread, time};
 /// This function does run through of all the main functionality of the protocol.
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let batch_size = 100;
+    let batch_size = 1;
     let n_moderators = 5; // must be less than the number of moderator containers
     let decryption_threshold = 3;
     let signing_threshold = 3;
