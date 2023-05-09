@@ -126,7 +126,7 @@ This process of ``voting'' adresses the question posed in \cite{hecate} of how t
 \textcite{hecate} includes an implementation and benchmark of the whole message cycle, so we focus on the modified portions of the protocol: token creation and message reporting.
 We implement these steps in Rust and run each party in a separate Linux container communicating over HTTP. Source code and more details are available on github \cite{cerberus-github}.
 Cerberus is much slower to create tokens than Hecate (on the order of 50x), but this isn't a huge surprise: the benchmarks were run on slower hardware, and the distributed nature of this protocol involves a multitude of verification, serialization, and communication steps that are not required in Hecate.
-With that said, the operational costs of implementing a protocol such as this are still \textit{well} within the budgetary constraints of a large company like Facebook. Extending the analysis in \cite{hecate}, we conservatively estimate the total cost of running all necessary servers to be well under \$1000 a day for the entirety of WhatsApp.
+With that said, the operational costs of implementing a protocol such as this are still \textit{well} within the budgetary constraints of a large company like Facebook. Extending the analysis in \cite{hecate}, we estimate the total cost of running all necessary servers to be under \$100 a day for the entirety of WhatsApp.
 
 \begin{table}[!t]
 	\renewcommand{\arraystretch}{1.3}
