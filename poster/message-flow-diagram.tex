@@ -1,0 +1,145 @@
+\begin{tikzpicture}
+	[
+		node distance = 9.5cm,
+		->,
+	]
+
+	% draw all the characters
+	\begin{scope}[
+			nodes = {minimum width = 3.3cm}
+		]
+		% sender
+		\node [
+			bob,
+			evil,
+			shirt = packergreen,
+			undershirt = packeryellow
+		] (bob) {Bob};
+
+		% recipient
+		\node [
+			alice,
+			right = 15cm of bob,
+			shirt = vikingpurple,
+			undershirt = vikingyellow,
+		] (alice) {Alice};
+
+		% signing mods
+		\node [judge, above left = of bob] (signer-1) {};
+		\node [judge, left = of bob] (signer-2) {};
+		\node [judge, below left = of bob] (signer-3) {};
+
+		% judging mods
+		\node [judge, female, above right = of alice] (judge-1) {};
+		\node [judge, right = of alice] (judge-2) {};
+		\node [judge, below right = of alice] (judge-3) {};
+
+		% police
+		\node [police, right = of judge-2] (police) {};
+
+	\end{scope}
+
+	% the message itself
+	\begin{scope}[
+			bend angle = 15,
+			bend left,
+			nodes = {
+					rounded corners,
+					align = center,
+					fill = white
+				}
+		]
+
+		% abusive message
+		\draw [line width = 2pt] {
+			(bob) to
+			node [inner sep = 1em, draw] (message) {
+					The Minnesota Vikings are \\
+					terrible at football.}
+			(alice)
+		};
+
+		% message label
+		\node at (message.north) [fill = white] {$m$};
+
+		% token
+		\node [
+			below = 2cm of message,
+			draw, dotted,
+			inner sep = 1em
+		] (token) {
+			\footnotesize
+			$x_1 = \Call{Enc}{\text{Bob}}$ \\
+			$\sigma_1, \ldots, \sigma_n$ \\
+			$\dots$
+		};
+
+		\draw[-., dotted] (token.north west) to node {\faicon{lock}} (message.south west);
+
+		% token label
+		\node at (token.north) [fill = white] {token};
+	\end{scope}
+
+	% --- MODERATOR INTERACTION ---
+	\begin{scope}[
+			bend angle = 5,
+			bend left,
+			nodes = {sloped, above},
+			line width = 2pt
+		]
+		% getting moderator signatures
+		\foreach \i in {1, 2, 3}
+		\draw {
+			(signer-\i) to
+			node {$\sigma_\i \ceq \Call{Sign}{x_1}$}
+			(bob)
+		};
+
+		% requesting decryption shares
+		\foreach \i in {1, 2, 3}
+		\draw {
+			(alice) to
+			node {$m$, token}
+			(judge-\i)
+		};
+
+		% responses
+		\foreach \i in {1, 2}
+		\draw {
+			(judge-\i) to
+			node {$d_\i$, m, token}
+			(police)
+		};
+	\end{scope}
+
+	% --- THOUGHT BUBBLES ---
+	\begin{scope}[
+			nodes = {
+					cloud callout,
+					draw,
+					aspect = 2.7,
+					fill = white
+				}
+		]
+
+		% decryption
+		% \node [
+		% 	node distance = .5em and 1em,
+		% 	above right = of police,
+		% 	callout absolute pointer={(police.north east)},
+		% ] {
+		% 	$\text{Bob} = \Call{Dec}{x_1, (d_1, d_2)}$
+		% };
+
+		% dissenting moderator 
+		\node[
+			node distance = .5em and 2em,
+			above right = of judge-3,
+			callout absolute pointer={(judge-3.north east)},
+			rotate = -10,
+		] {This isn't abusive\dots};
+	\end{scope}
+
+	% --- DECRYPTION ---
+
+\end{tikzpicture}

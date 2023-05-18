@@ -6,32 +6,36 @@
 % -- SPACING --
 % -------------
 
-\def\marginwidth{2cm}
-\def\footerheight{.15\paperheight}
-\def\centerwidth{.5\paperwidth}
-
-\RequirePackage{calc}
-\def\sidebarwidth{\dimexpr
-	(\paperwidth-\centerwidth-\marginwidth-\marginwidth)/2-\marginwidth\relax
-}
+\newlength{\marginwidth}
+\setlength{\marginwidth}{2cm}
 
 \RequirePackage[
 	left=\marginwidth,
 	right=\marginwidth,
 	top = \marginwidth,
 	bottom = 0cm,
-	a1paper,
-	landscape
+	paperheight = 24in,
+	paperwidth = 36in,
 ]{geometry}
+
+\newlength{\footerheight}
+\setlength{\footerheight}{\dimexpr.15\paperheight\relax}
+\def\centerwidth{.72\paperwidth}
+
+\RequirePackage{calc}
+\def\sidebarwidth{\dimexpr
+	\paperwidth-\centerwidth-\marginwidth-\marginwidth-\marginwidth
+}
 
 % -----------
 % -- FONTS --
 % -----------
 
 \usepackage[
-	fontsize=24pt,
+	fontsize=25pt,
 ]{fontsize}
 \renewcommand{\familydefault}{\sfdefault}
+
 \RequirePackage{parskip}
 
 % ------------
@@ -39,8 +43,9 @@
 % ------------
 
 \RequirePackage[dvipsnames]{xcolor}
-\colorlet{highlightcolor}{BrickRed}
-\colorlet{footercolor}{MidnightBlue}
+\colorlet{highlightcolor1}{BrickRed}
+\colorlet{highlightcolor2}{MidnightBlue}
+\colorlet{footercolor}{MidnightBlue!70!white}
 \colorlet{sidebarcolor}{MidnightBlue!20!white}
 
 % -----------
@@ -49,7 +54,9 @@
 
 \makeatletter
 \def\@maketitle{
-	\textcolor{BrickRed}{\Hugerr \bf \@title}
+	\raggedright
+	\textcolor{BrickRed}{\HUGE \bf \@title}
+
 	\bigskip
 
 	\@author
@@ -89,12 +96,12 @@
 
 \newcommand{\footer}[1]{
 	\vspace*{\fill}
-	% \noindent\begin{minipage}[c][\footerheight][c]{\linewidth}
 	\noindent\makebox[\linewidth][c]{%
 		\colorbox{footercolor}{%
 			\hspace{\marginwidth}
 			\begin{minipage}[t][\footerheight][t]{\textwidth}
-				\textcolor{white}{#1}
+				\color{white}
+				#1
 			\end{minipage}
 			\hspace{\marginwidth}
 		}

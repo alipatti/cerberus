@@ -1,11 +1,24 @@
 \documentclass{ali-poster}
 
-\usepackage{lipsum}
 \usepackage{graphicx}
+\usepackage{qrcode}
 \usepackage{ali-macros, ali-pseudocode, ali-crypto}
 
-\title{Balancing Privacy and Accountability on Encrypted Messaging Platforms}
-\author{Alistair Pattison and Nick Hopper}
+% diagram preamble material
+\usepackage{tikz}
+\usepackage{tikzpeople}
+\usepackage{fontawesome}
+\usetikzlibrary{positioning}
+\usetikzlibrary{shapes.callouts}
+
+\definecolor{packergreen}{RGB}{24,80,40}
+\definecolor{packeryellow}{RGB}{255,184,28}
+\definecolor{vikingpurple}{RGB}{79,38,131}
+\definecolor{vikingyellow}{RGB}{255,198,47}
+
+
+\title{Balancing Privacy and Accountability on Encrypted  Messaging Platforms}
+\author{Alistair Pattison and Nicholas Hopper}
 \date{S\&P Oakland, May 2023}
 
 \begin{document}
@@ -19,40 +32,40 @@
 
 	\section*{The Protocol}
 
-	This work extends a protocol by Issa, Alhaddad, and Varia called Hecate. In the Hecate protocol, every message requires a token
+	This work extends a protocol by Issa, Alhaddad, and Varia called Hecate. In the Hecate protocol, every message sent via an encrypted service requires a token containing (among other things), the encryption
 	\begin{equation*}
-		x_1 \ceq \Enc(id_{src}, \ pk_{mod}),
+		x_1 \ceq \Enc_{mod}(id_{src}).
 	\end{equation*}
-	and an ephemeral key pair $(pk_{eph}, sk_{eph})$. When a user sends a message, she attaches the signature
-	\begin{equation*}
-		\begin{gathered}
-			\sigma_{src} = \Sign_{sk_{eph}}(x_2) \\
-			x_2 \ceq x_1 \oplus H(m)
-		\end{gathered}
-	\end{equation*}
-	The signature binds $x_1$ to the sent message, and if the message is ever reported, the moderator decrypts $x_1$ with his private key to obtain the original sender's identity.
+	This $x_1$ is attached to a sent message so that if the message is reported, a moderator can decrypt $x_1$ to recover the sender's identity.
+	Using threshold cryptography, this work extends Hecate so that the source's identity is revealed only under sufficient agreement from a group of moderators.
 
-	\vspace{2cm}
+	\vspace{1cm}
 
 	% -- PSEUDOCODE -- 
 	\begin{algorithmic}[1]
 		\function{CreateToken}{$id_{usr}$}{
-			\State Compute $x_1 \ceq \tuple{g^r, \ id_{usr} \oplus H(pk_{mod}^r)}$ where $r \gets_\$ \Z_q$
-			\State Package $x_1$ into a token and send a signature request to each moderator along with the randomness $r$.
+			\State Compute $x_1 = \Enc(id_{src})$ using a $k$ out of $n$ threshold encryption scheme.
+			\State Package $x_1$ into a token and send a signature request to each moderator.
 			\State Each moderator verifies verifies $x_1$ and returns their signature share on the token.
-			\State Once sufficient responces are recieved, combine the signature shares into into a valid signature.
+			\State Once sufficient responses are received, combine the shares into into a valid signature.
 		}
 	\end{algorithmic}
 
-	\vspace{2cm}
+	\vspace{1cm}
 
 	\begin{algorithmic}[1]
 		\function{HandleReport}{$m$, $x_1$}{
-		\State A coordinator sends a request to all $n$ moderators containing the reported message $m$ and the encrypted id, $x_1 = \tuple{c_1, c_2}$.
-		\State If the moderator believes that the message is worth acting upon, she responds with the decrption share $d_i \ceq c_1^{s_i}$.
-		\State If enough decryption shares are received, the moderator recovers $x_1$.
+			\State A user sends a request to all $n$ moderators containing the reported message $m$ and the encrypted id, $x_1 = \tuple{c_1, c_2}$.
+			\State If a moderator believes that the message is worth acting upon, she forwards the decryption share $d_i$ to the appropriate authorities.
+			\State If enough decryption shares are received, one combines the decryption shares to recover $x_1$.
 		}
 	\end{algorithmic}
+
+	\medskip
+
+	\section*{Implementation}
+
+	We implement the protocol using Rust and run each party in a separate container communicating over HTTP. We estimate the cost of adoption to be around around \$100 per day for the entirety of WhatsApp. See the poster abstract for benchmark results.
 
 \end{panel}%
 \hspace{\marginwidth}
@@ -69,30 +82,31 @@
 
 	% -- SHORT SUMMARY -- 
 	\hfill\parbox{\dimexpr\centerwidth-4cm\relax}{
-		\Large
-		% TODO input abstract here
-		% highlight/bold important sentences
-		Encrypted messaging services like WhatsApp, Facebook Messenger, and Signal provide secure and deniable communication for billions across the world, but these exact properties prevent holding users accountable for sending messages that are abusive, misinformative, or otherwise harmful to society.
-		This work introduces a protocol in which {\bf\color{highlightcolor} the sender of an abusive message can be identified if there is sufficient agreement among a group of moderators}.
-		The protocol {\bf\color{footercolor} retains all security properties of the messaging service for unreported messages}.
+		\LARGE
+		This work introduces a protocol in which {\bf\color{highlightcolor1} the sender of an abusive message can be verified if there is sufficient agreement among a group of moderators}.
+		The protocol {\bf\color{highlightcolor2} retains all security properties of the messaging service for unreported messages}.
 
 	}\hfill\null
 
-	\vspace{2cm}
+	\vspace{4cm}
+
+	\begin{center}
+		\input{message-flow-diagram.tex}
+	\end{center}
 
 	% -- NEWSPAPER HEADLINES --
-	\begin{center}
-		\scalebox{.75}{\parbox{\centerwidth}{
-				\includegraphics{graphics/brazil-election.png}
-				\hspace{2cm}
-				\includegraphics{graphics/india-murder.png}
+	% \begin{center}
+	% 	\scalebox{.75}{\parbox{\centerwidth}{
+	% 			\includegraphics{graphics/brazil-election.png}
+	% 			\hspace{2cm}
+	% 			\includegraphics{graphics/india-murder.png}
 
-				\hfill \includegraphics[scale=1.25]{graphics/signal-uk.png} \hfill\null
-				\bigskip\bigskip
+	% 			\hfill \includegraphics[scale=1.25]{graphics/signal-uk.png} \hfill\null
+	% 			\bigskip\bigskip
 
-				\hspace{3cm}\includegraphics{graphics/fake-news.png}
-			}}
-	\end{center}
+	% 			\hspace{3cm}\includegraphics{graphics/fake-news.png}
+	% 		}}
+	% \end{center}
 
 \end{panel}%
 \hspace{\marginwidth}
@@ -101,32 +115,53 @@
 % -- RIGHT PANEL --
 % -------------------
 % 
-\begin{panel}{\sidebarwidth}{sidebarcolor}
-	\section*{Benchmarks}
 
-	We implement the protocol in Rust where each party runs in a separate Docker container and communicates over HTTP.
-
-	\vspace{5cm}
-
-	% TODO
-	\begin{center}
-		\textbf{TO BE COMPLETED FOR \\ FINAL POSTER}
-	\end{center}
-
-\end{panel}
-
+\qrset{
+	height=.4\footerheight,
+	version=6,
+}
 \footer{
 	\parbox[c][\footerheight]{.5\textwidth}{%
-		\Larger \bf
-		\ensuremath{\vcenter{\hbox{
-					\includegraphics[height=\dimexpr\footerheight-2cm\relax]{graphics/abstract-qr.png}}
-			}}
-		% https://www.the-qrcode-generator.com
-		\textleftarrow{} Download the extended abstract!
-	}%
+		\begin{tikzpicture}[
+				node distance = .5em and 5em,
+				font = \bfseries,
+				align = center,
+				qr/.style = {
+						font = \color{black},
+						fill = white,
+						inner sep = 5mm,
+						rounded corners = 3mm
+					}
+			]
+
+			% poster abstract
+			\node[qr] (abstract) {\qrcode{%
+					https://raw.githubusercontent.com/alipatti/cerberus/master/writeup/main.pdf}};
+			\node[below = of abstract] {Poster Abstract};
+
+			% implementation
+			\node[qr, right = of abstract] (github) {\qrcode{%
+					http://github.com/alipatti/cerberus}};
+			\node[below = of github] {Implementation};
+
+			% original hecate paper
+			\node[qr, right = of github] (hecate) {\qrcode{%
+					https://www.usenix.org/conference/usenixsecurity22/presentation/issa}};
+			\node[below = of hecate] {Hecate paper};
+		\end{tikzpicture}
+	}
 	\parbox[c][\footerheight]{.5\textwidth}{%
 		\hfill
-		\includegraphics[height=\dimexpr\footerheight/3\relax]{graphics/umn-logo.png}
+		\begin{tikzpicture}[
+				node distance = 1em,
+			]
+			\node (nsf) {
+				\includegraphics[height=.5\footerheight]{logos/nsf-logo.png}};
+			\node [right = of nsf] (umn) {
+				\includegraphics[height=.4\footerheight]{logos/umn-logo.png}};
+			\node [right = of umn] (carleton) {
+				\includegraphics[height=.5\footerheight]{logos/carleton-logo.png}};
+		\end{tikzpicture}
 	}
 }
 
