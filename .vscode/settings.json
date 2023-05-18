@@ -8,6 +8,7 @@
     "healthcheck",
     "reqwest",
     "Ristretto",
-    "Shamir"
+    "Shamir",
+    "whistleblowers"
   ]
 }
